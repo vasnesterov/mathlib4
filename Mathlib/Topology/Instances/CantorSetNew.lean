@@ -1,64 +1,248 @@
 import Mathlib
 
-theorem cantorSet_eq : cantorSet =
-    {x | ∃ (a : ℕ → Fin 3), (∀ i, a i ≠ 1) ∧ x = ∑' i, ((a i).val : ℝ) * (1/3)^(i + 1)} := by
-  ext x
-  refine ⟨fun h ↦ ?_, fun h ↦ ?_⟩
-  · sorry
-  · simp at h
-    obtain ⟨a, ha1, ha2⟩ := h
-    subst ha2
-    simp [cantorSet]
-    intro j
-    induction j with
-    | zero =>
-      simp
-      sorry
-    | succ j ih =>
-      simp
+noncomputable def reprReal (x : ℝ) (b : ℕ) [NeZero b] : ℕ → Fin b :=
+  fun i ↦ (⌊x * b^(i + 1)⌋ % b : ℤ)
+
+example : reprReal (1/4) 3 0 = 0 := by
+  simp [reprReal]
+  norm_num
+
+example : reprReal (1/4) 3 1 = 2 := by
+  simp [reprReal]
+  norm_num
+
+noncomputable def ofDigitsTerm {b : ℕ} [NeZero b] (digits : ℕ → Fin b) : ℕ → ℝ :=
+  fun i ↦ (digits i) * (b⁻¹ : ℝ)^(i + 1)
+
+theorem ofDigitsTerm_nonneg {b : ℕ} [NeZero b] {digits : ℕ → Fin b} {n : ℕ} :
+    0 ≤ ofDigitsTerm digits n := by
+  simp [ofDigitsTerm]
+  positivity
+
+theorem ofDigitsTerm_le {b : ℕ} [NeZero b] {digits : ℕ → Fin b} {n : ℕ} (hb : 0 < b) :
+    ofDigitsTerm digits n ≤ (b - 1) * (b⁻¹ : ℝ)^(n + 1) := by
+  simp [ofDigitsTerm]
+  gcongr
+  rw [← Nat.cast_pred hb]
+  norm_cast
+  omega
+
+-- todo : do we need this?
+theorem ofDigitsTerm_lt {b : ℕ} [NeZero b] {digits : ℕ → Fin b} {n : ℕ} (hb : 0 < b) :
+    ofDigitsTerm digits n < (b⁻¹ : ℝ)^n := by
+  calc
+    _ ≤ _ := ofDigitsTerm_le hb
+    _ < _ := by
+      rw [pow_succ]
+      move_mul [(b⁻¹ : ℝ)^n]
+      apply mul_lt_of_lt_one_left
+      · positivity
       sorry
 
+theorem ofDigitsTerm_Summable {b : ℕ} [NeZero b] (hb : 1 < b) {digits : ℕ → Fin b} :
+    Summable (ofDigitsTerm digits) := by
+  have h1 := summable_geometric_of_lt_one (r := (b⁻¹ : ℝ)) (by simp)
+    (by rify at hb; exact inv_lt_one_of_one_lt₀ hb)
+  apply Summable.mul_left (a := (b : ℝ)) at h1
+  replace h1 : Summable fun i ↦ b * (b : ℝ)⁻¹ ^ (i + 1) := by
+    sorry
+  apply Summable.of_nonneg_of_le _ _ h1
+  · intros
+    exact ofDigitsTerm_nonneg
+  intro i
+  -- todo: refactor with above
+  simp [ofDigitsTerm]
+  gcongr
+  simp
+
+lemma ofDigits_partial_sum_gt {x : ℝ} {b : ℕ} [NeZero b] (hb : 1 < b) (n : ℕ) :
+    x - (b⁻¹ : ℝ)^n < ∑ i ∈ Finset.range n, ofDigitsTerm (reprReal x b) i := by
+  sorry
+
+lemma ofDigits_partial_sum_le {x : ℝ} {b : ℕ} [NeZero b] (hb : 1 < b) (n : ℕ) :
+    ∑ i ∈ Finset.range n, ofDigitsTerm (reprReal x b) i ≤ x := by
+  sorry
+
+theorem ofDigits_HasSum (x : ℝ) (b : ℕ) [NeZero b] (hb : 1 < b) :
+    HasSum (ofDigitsTerm (reprReal x b)) x := by
+  rw [hasSum_iff_tendsto_nat_of_summable_norm]
+  swap
+  · conv => arg 1; ext i; simp; rw [abs_of_nonneg (by simp [ofDigitsTerm]; positivity)]
+    exact ofDigitsTerm_Summable hb
+  rw [← tendsto_sub_nhds_zero_iff]
+  apply tendsto_of_tendsto_of_tendsto_of_le_of_le (g := fun n ↦ -(b⁻¹ : ℝ)^n) (h := 0)
+  · rw [show (0 : ℝ) = -0 by simp]
+    apply Filter.Tendsto.neg
+    apply tendsto_pow_atTop_nhds_zero_of_abs_lt_one
+    rw [abs_of_nonneg (by positivity)]
+    rify at hb
+    exact inv_lt_one_of_one_lt₀ hb
+  · apply tendsto_const_nhds
+  · intro n
+    simp
+    have := ofDigits_partial_sum_gt (x := x) hb n
+    simp at this
+    linarith
+  · intro n
+    simp
+    apply ofDigits_partial_sum_le hb
+
+noncomputable def ofDigits {b : ℕ} [NeZero b] (digits : ℕ → Fin b) : ℝ :=
+  ∑' n, ofDigitsTerm digits n
+
+theorem reprReal_ofDigits (b : ℕ) [NeZero b] (x : ℝ) (hb : 1 < b) :
+    ofDigits (reprReal x b) = x := by
+  simp [ofDigits]
+  rw [← Summable.hasSum_iff]
+  · exact ofDigits_HasSum x b hb
+  · exact ofDigitsTerm_Summable hb
+
+theorem cantorRepr_unique (a b : ℕ → Fin 3) (x : ℝ)
+    (ha1 : HasSum (ofDigitsTerm a) x)
+    (ha2 : ∀ n, a n ≠ 1)
+    (hb1 : HasSum (ofDigitsTerm b) x)
+    (hb2 : ∀ n, b n ≠ 1) :
+    a = b := by
+  by_contra! h
+  replace h : ∃ n0, a n0 ≠ b n0 := by
+    contrapose! h
+    exact funext h
+  let n0 := Nat.find h
+  have h1 : ∀ n < n0, a n = b n := by
+    intro n hn
+    simpa using Nat.find_min h hn
+  have h2 : a n0 ≠ b n0 := by
+    simpa using Nat.find_spec h
+  generalize n0 = n1 at h1 h2
+  clear h n0
+  wlog h3 : a n1 = 0 ∧ b n1 = 2 generalizing a b
+  · replace h3 : a n1 = 2 ∧ b n1 = 0 := by
+      specialize ha2 n1
+      specialize hb2 n1
+      generalize a n1 = u at *
+      generalize b n1 = v at *
+      fin_cases u <;> fin_cases v <;> simp at ha2 hb2 h2 h3 ⊢
+    apply this b a hb1 hb2 ha1 ha2 (by intro n hn; symm; exact h1 n hn) h2.symm (by rwa [and_comm])
+  obtain ⟨h3, h4⟩ := h3
+  clear h2
+  rw [← hasSum_nat_add_iff' n1] at ha1 hb1
+  have : ∑ i ∈ Finset.range n1, ofDigitsTerm b i =
+      ∑ i ∈ Finset.range n1, ofDigitsTerm a i := by
+    apply Finset.sum_congr rfl
+    intro n hn
+    simp [ofDigitsTerm]
+    congr
+    symm
+    apply h1
+    simpa using hn
+  rw [this] at hb1
+  generalize x - ∑ i ∈ Finset.range n1, ofDigitsTerm a i = y at ha1 hb1
+  have hy_ge := sum_le_hasSum {0} (by intros; exact ofDigitsTerm_nonneg) hb1
+  simp [h4, ofDigitsTerm] at hy_ge
+  rw [← hasSum_nat_add_iff' 1] at ha1
+  simp at ha1
+  conv at ha1 => arg 2; simp [ofDigitsTerm, h3]
+  let geom (n : ℕ) : ℝ := 2 * (3⁻¹) ^ (n + 1 + n1 + 1)
+  have h_geom : HasSum geom ((3⁻¹)^(n1 + 1)) := by
+    simp [geom, pow_succ', pow_add]
+    ring_nf
+    have := hasSum_geometric_of_lt_one (r := (3⁻¹ : ℝ)) (by norm_num) (by norm_num)
+    apply HasSum.mul_right (3⁻¹ ^ n1 * (2 / 9)) at this
+    convert this using 1
+    · ext n
+      ring
+    · ring
+  have := hasSum_mono ha1 h_geom
+    (by intro n; simp [geom]; convert ofDigitsTerm_le (show 0 < 3 by norm_num) <;> simp; norm_num)
+  simp at this
+  replace this := hy_ge.trans this
+  simp at this
+
+theorem cantorRepr_mem_cantorSet (a : ℕ → Fin 3) (x : ℝ)
+    (h1 : HasSum (ofDigitsTerm a) x)
+    (h2 : ∀ n, a n ≠ 1) : x ∈ cantorSet := by
+  simp [cantorSet]
+  intro i
+  induction i generalizing a x with
+  | zero =>
+    simp
+    constructor
+    · apply h1.nonneg
+      intros
+      exact ofDigitsTerm_nonneg
+    let geom (n : ℕ) : ℝ := 2 * (3⁻¹)^(n + 1)
+    have h_geom : HasSum geom 1 := by
+      simp [geom, pow_add]
+      ring_nf
+      have := hasSum_geometric_of_lt_one (r := (3⁻¹ : ℝ)) (by norm_num) (by norm_num)
+      apply HasSum.mul_right (2 / 3) at this
+      convert this using 1
+      norm_num
+    exact hasSum_mono h1 h_geom
+      (by intro n; simp [geom]; convert ofDigitsTerm_le (show 0 < 3 by norm_num) <;> simp; norm_num)
+  | succ i ih =>
+    simp [preCantorSet]
+    have h3 := h2 0
+    replace h3 : a 0 = 0 ∨ a 0 = 2 := by
+      generalize a 0 = v at *
+      fin_cases v <;> simp at h3 ⊢
+    rcases h3 with h3 | h3
+    · left
+      use 3 * x
+      simp
+      apply ih (fun n ↦ a (n + 1)) _ _ (by solve_by_elim)
+      rw [← hasSum_nat_add_iff' 1] at h1
+      simp [h3] at h1
+      conv at h1 => arg 2; simp [ofDigitsTerm, h3]
+      apply HasSum.mul_right 3 at h1
+      convert h1 using 1
+      · ext n
+        simp [ofDigitsTerm]
+        ring
+      · ring
+    · right
+      -- copy-paste from above
+      use 3 * x - 2
+      simp
+      apply ih (fun n ↦ a (n + 1)) _ _ (by solve_by_elim)
+      rw [← hasSum_nat_add_iff' 1] at h1
+      simp [h3] at h1
+      conv at h1 => arg 2; simp [ofDigitsTerm, h3]
+      apply HasSum.mul_right 3 at h1
+      convert h1 using 1
+      · ext n
+        simp [ofDigitsTerm]
+        ring
+      · ring
+
+theorem cantorRepr_mem_cantorSet' (a : ℕ → Fin 3) (h : ∀ n, a n ≠ 1) : ofDigits a ∈ cantorSet := by
+  apply cantorRepr_mem_cantorSet a _ _ h
+  apply Summable.hasSum
+  apply ofDigitsTerm_Summable
+  norm_num
+
+theorem reprReal_of_cantorSet (x : ℝ) (hx : x ∈ cantorSet) : ∀ n, reprReal x 3 n ≠ 1 := by
+  intro n
+  sorry
+
 noncomputable def cantorSet_homeo : cantorSet ≃ₜ (ℕ → Bool) where
-  toFun := fun ⟨x, h⟩ =>
-    let a := (cantorSet_eq ▸ h).choose
-    fun i ↦ if a i = 0 then false else true
+  toFun := fun ⟨x, h⟩ ↦ fun i ↦ if reprReal x 3 i = 0 then 0 else 1
   invFun (x : ℕ → Bool) :=
     let a : ℕ → Fin 3 := fun i ↦ if x i then 2 else 0
-    let x : ℝ := ∑' i, ((a i).val : ℝ) * (1/3)^(i + 1)
+    let x : ℝ := ofDigits a
     have hx : x ∈ cantorSet := by
-      simp [cantorSet_eq, x]
-      use a
-      refine ⟨?_, by rfl⟩
-      intro i
+      simp [x]
+      apply cantorRepr_mem_cantorSet'
+      intro n
       simp [a]
       split_ifs <;> simp
     ⟨x, hx⟩
   left_inv := by
     intro ⟨x, hx⟩
     simp
-    generalize_proofs _ _ h
-    have ha := h.choose_spec
-    set a := h.choose
-    have : ∀ i, (if a i = 0 then 0 else 2) = a i := by
-      intro i
-      split_ifs with h_if
-      · exact h_if.symm
-      · have := ha.left i
-        omega
-    simp [this, ha.right]
+    sorry
   right_inv := by
-    intro b
-    ext j
-    simp
-    generalize_proofs _ _ h
-    have ha := h.choose_spec
-    set a := h.choose
-    -- here I need uniqness of representation above
-    cases hb : b j with
-    | false =>
-      sorry
-    | true =>
-      sorry
+    sorry
   continuous_toFun := by
     apply continuous_pi
     intro i
