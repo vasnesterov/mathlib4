@@ -221,12 +221,28 @@ theorem cantorRepr_mem_cantorSet' (a : ℕ → Fin 3) (h : ∀ n, a n ≠ 1) : o
   apply ofDigitsTerm_Summable
   norm_num
 
-theorem reprReal_of_cantorSet (x : ℝ) (hx : x ∈ cantorSet) : ∀ n, reprReal x 3 n ≠ 1 := by
-  intro n
+open Classical in
+noncomputable def cantorToDigits (x : ℝ) (n : ℕ) : Fin 3 :=
+  if 3 * x ∈ preCantorSet n then
+    0
+  else
+    2
+
+theorem cantorToDigits_ne_one {x : ℝ} {n : ℕ} : cantorToDigits x n ≠ 1 := by
+  simp [cantorToDigits]
+  split_ifs <;> simp
+
+theorem ofDigits_cantorToDigits {x : ℝ} (hx : x ∈ cantorSet) : ofDigits (cantorToDigits x) = x := by
+  simp [ofDigits]
+  rw [HasSum.tsum_eq]
+  rw [hasSum_iff_tendsto_nat_of_summable_norm]
+  swap
+  · conv => arg 1; ext i; simp; rw [abs_of_nonneg (by simp [ofDigitsTerm])]
+    exact ofDigitsTerm_Summable (show 1 < 3 by norm_num)
   sorry
 
-noncomputable def cantorSet_homeo : cantorSet ≃ₜ (ℕ → Bool) where
-  toFun := fun ⟨x, h⟩ ↦ fun i ↦ if reprReal x 3 i = 0 then 0 else 1
+noncomputable def cantorSet_equiv : cantorSet ≃ (ℕ → Bool) where
+  toFun := fun ⟨x, h⟩ ↦ fun i ↦ if cantorToDigits x i = 0 then 0 else 1
   invFun (x : ℕ → Bool) :=
     let a : ℕ → Fin 3 := fun i ↦ if x i then 2 else 0
     let x : ℝ := ofDigits a
@@ -240,18 +256,76 @@ noncomputable def cantorSet_homeo : cantorSet ≃ₜ (ℕ → Bool) where
   left_inv := by
     intro ⟨x, hx⟩
     simp
-    sorry
+    convert ofDigits_cantorToDigits hx
+    rename_i i
+    split_ifs with h_if
+    · simp at h_if
+      have : cantorToDigits x i ≠ 1 := cantorToDigits_ne_one
+      generalize cantorToDigits x i = u at *
+      fin_cases u <;> simp at h_if this ⊢
+    · simp at h_if
+      rw [h_if]
   right_inv := by
-    sorry
-  continuous_toFun := by
+    intro b
+    simp [cantorToDigits]
+    ext i
+    split_ifs with h1 h2
+    · sorry
+    · simp at h2
+    · omega
+    · sorry
+
+instance : CompactSpace cantorSet := by
+  rw [← isCompact_iff_compactSpace]
+  exact isCompact_cantorSet
+
+noncomputable def cantorSet_homeo : cantorSet ≃ₜ (ℕ → Bool) :=
+  Continuous.homeoOfEquivCompactToT2 (f := cantorSet_equiv)
+  (by
     apply continuous_pi
     intro i
-    simp
+    simp [cantorSet_equiv]
     rw [continuous_discrete_rng]
     intro b
-    sorry
-  continuous_invFun := by
-    sorry
+    cases b
+    · have : ((fun a ↦ if cantorToDigits (↑a) i = 0 then 0 else 1) ⁻¹' {false} : Set cantorSet) =
+        ({x | cantorToDigits x i = 0} : Set cantorSet) := by
+        ext x
+        simp
+        intro
+        rfl
+      rw [this]
+      sorry
+    · sorry
+  )
+
+-- noncomputable def cantorSet_homeo : cantorSet ≃ₜ (ℕ → Bool) where
+--   toFun := fun ⟨x, h⟩ ↦ fun i ↦ if reprReal x 3 i = 0 then 0 else 1
+--   invFun (x : ℕ → Bool) :=
+--     let a : ℕ → Fin 3 := fun i ↦ if x i then 2 else 0
+--     let x : ℝ := ofDigits a
+--     have hx : x ∈ cantorSet := by
+--       simp [x]
+--       apply cantorRepr_mem_cantorSet'
+--       intro n
+--       simp [a]
+--       split_ifs <;> simp
+--     ⟨x, hx⟩
+--   left_inv := by
+--     intro ⟨x, hx⟩
+--     simp
+--     sorry
+--   right_inv := by
+--     sorry
+--   continuous_toFun := by
+--     apply continuous_pi
+--     intro i
+--     simp
+--     rw [continuous_discrete_rng]
+--     intro b
+--     sorry
+--   continuous_invFun := by
+--     sorry
 
 noncomputable def fromBinary (b : ℕ → Bool) : unitInterval :=
   let x : ℝ := ∑' i, (if b i then 1 else 0) * (1 / 2)^(i + 1)
