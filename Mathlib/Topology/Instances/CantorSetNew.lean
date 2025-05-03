@@ -90,6 +90,17 @@ theorem ofDigits_HasSum (x : ℝ) (b : ℕ) [NeZero b] (hb : 1 < b) :
 noncomputable def ofDigits {b : ℕ} [NeZero b] (digits : ℕ → Fin b) : ℝ :=
   ∑' n, ofDigitsTerm digits n
 
+theorem ofDigits_nonneg {b : ℕ} [NeZero b] {digits : ℕ → Fin b} : 0 ≤ ofDigits digits := by
+  simp [ofDigits]
+  apply tsum_nonneg
+  intro i
+  exact ofDigitsTerm_nonneg
+
+theorem ofDigits_le_one {b : ℕ} [NeZero b] {digits : ℕ → Fin b} : ofDigits digits ≤ 1 := by
+  simp [ofDigits]
+  sorry
+  -- apply Summable.tsum_mono
+
 theorem reprReal_ofDigits (b : ℕ) [NeZero b] (x : ℝ) (hb : 1 < b) :
     ofDigits (reprReal x b) = x := by
   simp [ofDigits]
@@ -286,6 +297,8 @@ noncomputable def cantorSet_homeo : cantorSet ≃ₜ (ℕ → Bool) :=
     intro i
     simp [cantorSet_equiv]
     rw [continuous_discrete_rng]
+    suffices ∀ (b : Bool), IsClosed ((fun (a : cantorSet) ↦ if cantorToDigits a i = 0 then 0 else 1) ⁻¹' {b}) by
+      sorry -- finite discrete topology
     intro b
     cases b
     · have : ((fun a ↦ if cantorToDigits (↑a) i = 0 then 0 else 1) ⁻¹' {false} : Set cantorSet) =
@@ -295,49 +308,106 @@ noncomputable def cantorSet_homeo : cantorSet ≃ₜ (ℕ → Bool) :=
         intro
         rfl
       rw [this]
-      sorry
-    · sorry
+      clear this
+      simp [cantorToDigits]
+      have : ({x | (3 : ℝ) * x ∈ preCantorSet i} : Set cantorSet) =
+          Subtype.val ⁻¹' {x | (3 : ℝ) * x ∈ preCantorSet i} := by
+        ext x
+        simp
+      rw [this]
+      clear this
+      apply IsClosed.preimage continuous_subtype_val
+      have : {x | 3 * x ∈ preCantorSet i} = (fun x ↦ 3⁻¹ * x) '' (preCantorSet i) := by
+        ext x
+        simp
+        constructor
+        · intro h
+          use 3 * x
+          simp [h]
+        · intro ⟨y, h1, h2⟩
+          rw [← h2]
+          convert h1
+          ring
+      rw [this]
+      clear this
+      suffices IsClosed (preCantorSet i) by
+        sorry
+      exact isClosed_preCantorSet i
+    · have : ((fun a ↦ if cantorToDigits (↑a) i = 0 then 0 else 1) ⁻¹' {true} : Set cantorSet) =
+        ({x | cantorToDigits x i = 2} : Set cantorSet) := by
+        ext x
+        simp
+        have := @cantorToDigits_ne_one x i
+        generalize cantorToDigits x i = u at this
+        constructor
+        · intro ⟨h, _⟩
+          fin_cases u <;> simp at this h ⊢
+        · intro h
+          refine ⟨?_, rfl⟩
+          fin_cases u <;> simp at this h ⊢
+      rw [this]
+      clear this
+      simp [cantorToDigits]
+      have : ({x | (3 : ℝ) * x ∉ preCantorSet i} : Set cantorSet) =
+          ({x | (3 : ℝ) * x - 2 ∈ preCantorSet i} : Set cantorSet) := by
+        ext ⟨x, h1⟩
+        simp [cantorSet] at h1
+        specialize h1 (i + 1)
+        simp at h1
+        simp
+        clear * - h1 -- TODO: why does simp duplicates hypothesis?
+        constructor
+        · intro h2
+          rcases h1 with ⟨y, h1, hx⟩ | ⟨y, h1, hx⟩ <;> subst hx
+          · ring_nf at h2
+            contradiction
+          · ring_nf
+            exact h1
+        · intro h2
+          sorry -- use that 3 * x - 2 in [0, 1]
+      rw [this]
+      clear this
+      have : ({x | (3 : ℝ) * x - 2 ∈ preCantorSet i} : Set cantorSet) =
+          Subtype.val ⁻¹' {x | (3 : ℝ) * x - 2 ∈ preCantorSet i} := by
+        ext x
+        simp
+      rw [this]
+      clear this
+      apply IsClosed.preimage continuous_subtype_val
+      have : {x | 3 * x - 2 ∈ preCantorSet i} = (fun x ↦ 3⁻¹ * (x + 2)) '' (preCantorSet i) := by
+        ext x
+        simp
+        constructor
+        · intro h
+          use 3 * x - 2
+          simp [h]
+        · intro ⟨y, h1, h2⟩
+          rw [← h2]
+          convert h1
+          ring
+      rw [this]
+      clear this
+      suffices IsClosed (preCantorSet i) by
+        sorry
+      exact isClosed_preCantorSet i
   )
 
--- noncomputable def cantorSet_homeo : cantorSet ≃ₜ (ℕ → Bool) where
---   toFun := fun ⟨x, h⟩ ↦ fun i ↦ if reprReal x 3 i = 0 then 0 else 1
---   invFun (x : ℕ → Bool) :=
---     let a : ℕ → Fin 3 := fun i ↦ if x i then 2 else 0
---     let x : ℝ := ofDigits a
---     have hx : x ∈ cantorSet := by
---       simp [x]
---       apply cantorRepr_mem_cantorSet'
---       intro n
---       simp [a]
---       split_ifs <;> simp
---     ⟨x, hx⟩
---   left_inv := by
---     intro ⟨x, hx⟩
---     simp
---     sorry
---   right_inv := by
---     sorry
---   continuous_toFun := by
---     apply continuous_pi
---     intro i
---     simp
---     rw [continuous_discrete_rng]
---     intro b
---     sorry
---   continuous_invFun := by
---     sorry
-
 noncomputable def fromBinary (b : ℕ → Bool) : unitInterval :=
-  let x : ℝ := ∑' i, (if b i then 1 else 0) * (1 / 2)^(i + 1)
+  let x : ℝ := ofDigits (finTwoEquiv.symm ∘ b)
   have hx : x ∈ Set.Icc 0 1 := by
-    sorry
+    simp [x]
+    constructor
+    · exact ofDigits_nonneg
+    · exact ofDigits_le_one
   ⟨x, hx⟩
 
 theorem fromBinary_continuous : Continuous fromBinary := by
   sorry
 
 theorem fromBinary_surjective : Function.Surjective fromBinary := by
-  sorry
+  intro x
+  use finTwoEquiv ∘ (reprReal x 2)
+  simp [fromBinary, ← Function.comp_assoc, reprReal_ofDigits]
 
 noncomputable def cantorSet_product : cantorSet ≃ₜ (ℕ → cantorSet) := by
   sorry
@@ -424,3 +494,44 @@ theorem projectCantor_continuous {X : Type} [MetricSpace X] [CompactSpace X] :
 theorem projectCantor_surjective {X : Type} [MetricSpace X] [CompactSpace X] :
     Function.Surjective (projectCantor X) := by
   sorry
+
+/- Peano curve -/
+
+lemma unitInterval_eq_closedBall : unitInterval = Metric.closedBall 2⁻¹ 2⁻¹ := by
+  ext x
+  simp [dist, abs_le']
+  norm_num
+  rw [and_comm]
+
+instance : TietzeExtension unitInterval := by
+  rw [unitInterval_eq_closedBall]
+  apply Metric.instTietzeExtensionClosedBall ℝ
+  norm_num
+
+lemma long_peano_curve : ∃ f : C(ℝ, unitInterval × unitInterval), Set.univ = f '' cantorSet  := by
+  let g : C(cantorSet, unitInterval × unitInterval) :=
+    ⟨projectCantor (unitInterval × unitInterval), by apply projectCantor_continuous⟩
+  obtain ⟨f, hf⟩ := ContinuousMap.exists_restrict_eq isClosed_cantorSet g
+  use f
+  have hg : Function.Surjective g := by
+    simp [g]
+    exact projectCantor_surjective
+  ext y
+  simp
+  obtain ⟨x, hx⟩ := hg y
+  use x
+  have := ContinuousMap.restrict_apply f cantorSet x
+  simp [← this, hf, hx]
+
+lemma peano_curve :
+    ∃ f : C(unitInterval, unitInterval × unitInterval), Function.Surjective f := by
+  obtain ⟨f, hf⟩ := long_peano_curve
+  let g := ContinuousMap.restrict unitInterval f
+  use g
+  intro y
+  rw [Set.ext_iff] at hf
+  specialize hf y
+  simp at hf
+  obtain ⟨x, hx1, hx2⟩ := hf
+  use ⟨x, by simp [cantorSet] at hx1; specialize hx1 0; simpa using hx1⟩
+  simp [g, hx2]
