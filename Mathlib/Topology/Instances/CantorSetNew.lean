@@ -290,6 +290,21 @@ instance : CompactSpace cantorSet := by
   rw [← isCompact_iff_compactSpace]
   exact isCompact_cantorSet
 
+lemma preCantorSet_mono {n m : ℕ} (h : n ≤ m) : preCantorSet m ⊆ preCantorSet n := by
+  induction m, h using Nat.le_induction with
+  | base => rfl
+  | succ m hm ih =>
+    trans preCantorSet m
+    swap
+    · exact ih
+    simp
+    sorry
+    -- constructor
+
+lemma preCantorSet_subset_unitInterval {n : ℕ} : preCantorSet n ⊆ Set.Icc 0 1 := by
+  rw [← preCantorSet_zero]
+  apply preCantorSet_mono (by simp)
+
 noncomputable def cantorSet_homeo : cantorSet ≃ₜ (ℕ → Bool) :=
   Continuous.homeoOfEquivCompactToT2 (f := cantorSet_equiv)
   (by
@@ -330,8 +345,9 @@ noncomputable def cantorSet_homeo : cantorSet ≃ₜ (ℕ → Bool) :=
           ring
       rw [this]
       clear this
-      suffices IsClosed (preCantorSet i) by
-        sorry
+      rw [← Topology.IsClosedEmbedding.isClosed_iff_image_isClosed]
+      swap
+      · sorry
       exact isClosed_preCantorSet i
     · have : ((fun a ↦ if cantorToDigits (↑a) i = 0 then 0 else 1) ⁻¹' {true} : Set cantorSet) =
         ({x | cantorToDigits x i = 2} : Set cantorSet) := by
@@ -363,8 +379,11 @@ noncomputable def cantorSet_homeo : cantorSet ≃ₜ (ℕ → Bool) :=
             contradiction
           · ring_nf
             exact h1
-        · intro h2
-          sorry -- use that 3 * x - 2 in [0, 1]
+        · intro h2 h3
+          apply preCantorSet_subset_unitInterval at h2
+          apply preCantorSet_subset_unitInterval at h3
+          simp at h2 h3
+          linarith
       rw [this]
       clear this
       have : ({x | (3 : ℝ) * x - 2 ∈ preCantorSet i} : Set cantorSet) =
@@ -387,8 +406,9 @@ noncomputable def cantorSet_homeo : cantorSet ≃ₜ (ℕ → Bool) :=
           ring
       rw [this]
       clear this
-      suffices IsClosed (preCantorSet i) by
-        sorry
+      rw [← Topology.IsClosedEmbedding.isClosed_iff_image_isClosed]
+      swap
+      · sorry
       exact isClosed_preCantorSet i
   )
 
