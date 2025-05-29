@@ -1,5 +1,51 @@
 import Mathlib
 
+theorem preCantorSet_Antitone : Antitone preCantorSet := by
+  intro n m h
+  simp only [Set.le_eq_subset]
+  induction m, h using Nat.le_induction with
+  | base => rfl
+  | succ m hm ih =>
+    trans preCantorSet m
+    swap
+    · exact ih
+    clear * -
+    simp only [preCantorSet_succ, Set.union_subset_iff]
+    induction m with
+    | zero =>
+      simp only [preCantorSet_zero]
+      constructor <;> intro x <;> simp only [Set.mem_image, Set.mem_Icc, forall_exists_index,
+        and_imp] <;> intro y <;> intros <;> constructor <;> linarith
+    | succ m ih =>
+      simp only [preCantorSet_succ, Set.union_subset_iff, Set.image_union]
+      constructor
+      · constructor <;> apply Set.subset_union_of_subset_left
+        · exact Set.image_mono ih.left
+        · exact Set.image_mono ih.right
+      · constructor <;> apply Set.subset_union_of_subset_right
+        · exact Set.image_mono ih.left
+        · exact Set.image_mono ih.right
+
+theorem cantorSet_eq_union_small_cantorSets :
+    cantorSet = (· / 3) '' cantorSet ∪ (fun x ↦ (2 + x) / 3) '' cantorSet := by
+  simp [cantorSet]
+  rw [Set.image_iInter, Set.image_iInter]
+  rotate_left
+  · change Function.Bijective ((fun x ↦ x / 3) ∘ (fun x ↦ 2 + x))
+    apply Function.Bijective.comp
+    · apply mulRight_bijective₀ 3⁻¹
+      norm_num
+    · exact AddGroup.addLeft_bijective 2
+  · apply mulRight_bijective₀ 3⁻¹
+    norm_num
+  rw [← Set.iInter_union_of_antitone]
+  rotate_left
+  · apply Monotone.comp_antitone Set.monotone_image preCantorSet_Antitone
+  · apply Monotone.comp_antitone Set.monotone_image preCantorSet_Antitone
+  change ⋂ n, preCantorSet n = ⋂ n, preCantorSet (n + 1)
+  symm
+  apply Antitone.iInter_nat_add preCantorSet_Antitone
+
 noncomputable def reprReal (x : ℝ) (b : ℕ) [NeZero b] : ℕ → Fin b :=
   fun i ↦ (⌊x * b^(i + 1)⌋ % b : ℤ)
 
@@ -296,10 +342,6 @@ noncomputable def cantorStep (x : ℝ) : ℝ :=
   else
     3 * x - 2
 
-theorem cantorSet_eq_union_small_cantorSets : cantorSet = (· / 3) '' cantorSet ∪ (fun x ↦ (2 + x) / 3) '' cantorSet := by
-  ext x
-  sorry
-
 theorem cantorStep_mem_cantorSet {x : ℝ} (hx : x ∈ cantorSet) : cantorStep x ∈ cantorSet := by
   simp only [cantorStep]
   rw [cantorSet_eq_union_small_cantorSets] at hx
@@ -474,20 +516,9 @@ instance : CompactSpace cantorSet := by
   rw [← isCompact_iff_compactSpace]
   exact isCompact_cantorSet
 
-lemma preCantorSet_mono {n m : ℕ} (h : n ≤ m) : preCantorSet m ⊆ preCantorSet n := by
-  induction m, h using Nat.le_induction with
-  | base => rfl
-  | succ m hm ih =>
-    trans preCantorSet m
-    swap
-    · exact ih
-    simp
-    sorry
-    -- constructor
-
 lemma preCantorSet_subset_unitInterval {n : ℕ} : preCantorSet n ⊆ Set.Icc 0 1 := by
   rw [← preCantorSet_zero]
-  apply preCantorSet_mono (by simp)
+  apply preCantorSet_Antitone (by simp)
 
 noncomputable def cantorSet_homeo : cantorSet ≃ₜ (ℕ → Bool) :=
   Continuous.homeoOfEquivCompactToT2 (f := cantorSet_equiv)
