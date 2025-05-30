@@ -54,8 +54,8 @@ variable {𝕜 E F : Type*} [RCLike 𝕜]
 variable [NormedAddCommGroup E] [NormedAddCommGroup F]
 variable [InnerProductSpace 𝕜 E] [InnerProductSpace ℝ F]
 
-local notation "⟪" x ", " y "⟫" => @inner 𝕜 _ _ x y
-local notation "absR" => abs
+local notation "⟪" x ", " y "⟫" => inner 𝕜 x y
+local notation "absR" => @abs ℝ _ _
 
 /-! ### Orthogonal projection in inner product spaces -/
 
@@ -117,7 +117,7 @@ theorem exists_norm_eq_iInf_of_complete_convex {K : Set F} (ne : K.Nonempty) (h�
               2 * ‖u - half • (wq + wp)‖ * (2 * ‖u - half • (wq + wp)‖) + ‖wp - wq‖ * ‖wp - wq‖ :=
             by ring
           _ =
-              absR (2 : ℝ) * ‖u - half • (wq + wp)‖ * (absR (2 : ℝ) * ‖u - half • (wq + wp)‖) +
+              absR 2 * ‖u - half • (wq + wp)‖ * (absR 2 * ‖u - half • (wq + wp)‖) +
                 ‖wp - wq‖ * ‖wp - wq‖ := by
             rw [abs_of_nonneg]
             exact zero_le_two
@@ -201,22 +201,22 @@ theorem norm_eq_iInf_iff_real_inner_le_zero {K : Set F} (h : Convex ℝ K) {u : 
               rw [smul_sub, sub_smul, one_smul]
               simp only [sub_eq_add_neg, add_comm, add_left_comm, add_assoc, neg_add_rev]
             rw [this]
-          _ = ‖u - v‖ ^ 2 - 2 * θ * inner (u - v) (w - v) + θ * θ * ‖w - v‖ ^ 2 := by
+          _ = ‖u - v‖ ^ 2 - 2 * θ * ⟪u - v, w - v⟫_ℝ + θ * θ * ‖w - v‖ ^ 2 := by
             rw [@norm_sub_sq ℝ, inner_smul_right, norm_smul]
             simp only [sq]
             show
-              ‖u - v‖ * ‖u - v‖ - 2 * (θ * inner (u - v) (w - v)) +
+              ‖u - v‖ * ‖u - v‖ - 2 * (θ * ⟪u - v, w - v⟫_ℝ) +
                 absR θ * ‖w - v‖ * (absR θ * ‖w - v‖) =
-              ‖u - v‖ * ‖u - v‖ - 2 * θ * inner (u - v) (w - v) + θ * θ * (‖w - v‖ * ‖w - v‖)
+              ‖u - v‖ * ‖u - v‖ - 2 * θ * ⟪u - v, w - v⟫_ℝ + θ * θ * (‖w - v‖ * ‖w - v‖)
             rw [abs_of_pos hθ₁]; ring
       have eq₁ :
-        ‖u - v‖ ^ 2 - 2 * θ * inner (u - v) (w - v) + θ * θ * ‖w - v‖ ^ 2 =
-          ‖u - v‖ ^ 2 + (θ * θ * ‖w - v‖ ^ 2 - 2 * θ * inner (u - v) (w - v)) := by
+        ‖u - v‖ ^ 2 - 2 * θ * ⟪u - v, w - v⟫_ℝ + θ * θ * ‖w - v‖ ^ 2 =
+          ‖u - v‖ ^ 2 + (θ * θ * ‖w - v‖ ^ 2 - 2 * θ * ⟪u - v, w - v⟫_ℝ) := by
         abel
       rw [eq₁, le_add_iff_nonneg_right] at this
       have eq₂ :
-        θ * θ * ‖w - v‖ ^ 2 - 2 * θ * inner (u - v) (w - v) =
-          θ * (θ * ‖w - v‖ ^ 2 - 2 * inner (u - v) (w - v)) := by ring
+        θ * θ * ‖w - v‖ ^ 2 - 2 * θ * ⟪u - v, w - v⟫_ℝ =
+          θ * (θ * ‖w - v‖ ^ 2 - 2 * ⟪u - v, w - v⟫_ℝ) := by ring
       rw [eq₂] at this
       exact le_of_sub_nonneg (nonneg_of_mul_nonneg_right this hθ₁)
     by_cases hq : q = 0
@@ -246,8 +246,8 @@ theorem norm_eq_iInf_iff_real_inner_le_zero {K : Set F} (h : Convex ℝ K) {u : 
       apply nonneg_le_nonneg_of_sq_le_sq (norm_nonneg _)
       have := h w w.2
       calc
-        ‖u - v‖ * ‖u - v‖ ≤ ‖u - v‖ * ‖u - v‖ - 2 * inner (u - v) ((w : F) - v) := by linarith
-        _ ≤ ‖u - v‖ ^ 2 - 2 * inner (u - v) ((w : F) - v) + ‖(w : F) - v‖ ^ 2 := by
+        ‖u - v‖ * ‖u - v‖ ≤ ‖u - v‖ * ‖u - v‖ - 2 * ⟪u - v, w - v⟫_ℝ := by linarith
+        _ ≤ ‖u - v‖ ^ 2 - 2 * ⟪u - v, w - v⟫_ℝ + ‖w - v‖ ^ 2 := by
           rw [sq]
           refine le_add_of_nonneg_right ?_
           exact sq_nonneg _
@@ -347,7 +347,7 @@ theorem norm_eq_iInf_iff_inner_eq_zero {u : E} {v : E} (hv : v ∈ K) :
     have : ∀ w ∈ K', ⟪u - v, w⟫_ℝ = 0 := by
       intro w hw
       rw [real_inner_eq_re_inner, H w hw]
-      exact zero_re'
+      exact zero_re
     exact (K'.norm_eq_iInf_iff_real_inner_eq_zero hv).2 this
 
 /-- A subspace `K : Submodule 𝕜 E` has an orthogonal projection if every vector `v : E` admits an
@@ -642,11 +642,7 @@ def reflection : E ≃ₗᵢ[𝕜] E :=
       let v := x - w
       have : ⟪v, w⟫ = 0 := orthogonalProjection_inner_eq_zero x w w.2
       convert norm_sub_eq_norm_add this using 2
-      · rw [LinearEquiv.coe_mk, reflectionLinearEquiv, LinearEquiv.toFun_eq_coe,
-          LinearEquiv.coe_ofInvolutive, LinearMap.sub_apply, LinearMap.id_apply, two_smul,
-          LinearMap.add_apply, LinearMap.comp_apply, Submodule.subtype_apply,
-          ContinuousLinearMap.coe_coe]
-        dsimp [v]
+      · dsimp [reflectionLinearEquiv, v]
         abel
       · simp only [v, add_sub_cancel, eq_self_iff_true] }
 
@@ -1335,7 +1331,7 @@ theorem maximal_orthonormal_iff_orthogonalComplement_eq_bot (hv : Orthonormal �
       have : e ≠ 0 := hv.ne_zero ⟨e, hev⟩
       contradiction
     -- put this together with `v` to provide a candidate orthonormal basis for the whole space
-    refine ⟨insert e v, v.subset_insert e, ⟨?_, ?_⟩, (ne_insert_of_not_mem v he'').symm⟩
+    refine ⟨insert e v, v.subset_insert e, ⟨?_, ?_⟩, (ne_insert_of_notMem v he'').symm⟩
     · -- show that the elements of `insert e v` have unit length
       rintro ⟨a, ha'⟩
       rcases eq_or_mem_of_mem_insert ha' with ha | ha
