@@ -531,112 +531,113 @@ lemma preCantorSet_subset_unitInterval {n : ℕ} : preCantorSet n ⊆ Set.Icc 0 
   rw [← preCantorSet_zero]
   apply preCantorSet_Antitone (by simp)
 
+theorem cantorSet_equiv_continuous : Continuous cantorSet_equiv := by
+  apply continuous_pi
+  intro i
+  simp [cantorSet_equiv]
+  rw [continuous_discrete_rng]
+  suffices ∀ (b : Bool), IsClosed ((fun (a : cantorSet) ↦ if cantorToDigits a i = 0 then 0 else 1) ⁻¹' {b}) by
+    sorry -- finite discrete topology
+  intro b
+  cases b
+  · have : ((fun a ↦ if cantorToDigits (↑a) i = 0 then 0 else 1) ⁻¹' {false} : Set cantorSet) =
+      ({x | cantorToDigits x i = 0} : Set cantorSet) := by
+      ext x
+      simp
+      intro
+      rfl
+    rw [this]
+    clear this
+    simp [cantorToDigits]
+    have : ({x | (3 : ℝ) * x ∈ preCantorSet i} : Set cantorSet) =
+        Subtype.val ⁻¹' {x | (3 : ℝ) * x ∈ preCantorSet i} := by
+      ext x
+      simp
+    rw [this]
+    clear this
+    apply IsClosed.preimage continuous_subtype_val
+    have : {x | 3 * x ∈ preCantorSet i} = (fun x ↦ 3⁻¹ * x) '' (preCantorSet i) := by
+      ext x
+      simp
+      constructor
+      · intro h
+        use 3 * x
+        simp [h]
+      · intro ⟨y, h1, h2⟩
+        rw [← h2]
+        convert h1
+        ring
+    rw [this]
+    clear this
+    rw [← Topology.IsClosedEmbedding.isClosed_iff_image_isClosed]
+    swap
+    · sorry
+    exact isClosed_preCantorSet i
+  · have : ((fun a ↦ if cantorToDigits (↑a) i = 0 then 0 else 1) ⁻¹' {true} : Set cantorSet) =
+      ({x | cantorToDigits x i = 2} : Set cantorSet) := by
+      ext x
+      simp
+      have := @cantorToDigits_ne_one x i
+      generalize cantorToDigits x i = u at this
+      constructor
+      · intro ⟨h, _⟩
+        fin_cases u <;> simp at this h ⊢
+      · intro h
+        refine ⟨?_, rfl⟩
+        fin_cases u <;> simp at this h ⊢
+    rw [this]
+    clear this
+    simp [cantorToDigits]
+    have : ({x | (3 : ℝ) * x ∉ preCantorSet i} : Set cantorSet) =
+        ({x | (3 : ℝ) * x - 2 ∈ preCantorSet i} : Set cantorSet) := by
+      ext ⟨x, h1⟩
+      simp [cantorSet] at h1
+      specialize h1 (i + 1)
+      simp at h1
+      simp
+      clear * - h1 -- TODO: why does simp duplicates hypothesis?
+      constructor
+      · intro h2
+        rcases h1 with ⟨y, h1, hx⟩ | ⟨y, h1, hx⟩ <;> subst hx
+        · ring_nf at h2
+          contradiction
+        · ring_nf
+          exact h1
+      · intro h2 h3
+        apply preCantorSet_subset_unitInterval at h2
+        apply preCantorSet_subset_unitInterval at h3
+        simp at h2 h3
+        linarith
+    rw [this]
+    clear this
+    have : ({x | (3 : ℝ) * x - 2 ∈ preCantorSet i} : Set cantorSet) =
+        Subtype.val ⁻¹' {x | (3 : ℝ) * x - 2 ∈ preCantorSet i} := by
+      ext x
+      simp
+    rw [this]
+    clear this
+    apply IsClosed.preimage continuous_subtype_val
+    have : {x | 3 * x - 2 ∈ preCantorSet i} = (fun x ↦ 3⁻¹ * (x + 2)) '' (preCantorSet i) := by
+      ext x
+      simp
+      constructor
+      · intro h
+        use 3 * x - 2
+        simp [h]
+      · intro ⟨y, h1, h2⟩
+        rw [← h2]
+        convert h1
+        ring
+    rw [this]
+    clear this
+    rw [← Topology.IsClosedEmbedding.isClosed_iff_image_isClosed]
+    swap
+    · sorry
+    exact isClosed_preCantorSet i
+
+
 noncomputable def cantorSet_homeo : cantorSet ≃ₜ (ℕ → Bool) :=
-  Continuous.homeoOfEquivCompactToT2 (f := cantorSet_equiv)
-  (by
-    apply continuous_pi
-    intro i
-    simp [cantorSet_equiv]
-    rw [continuous_discrete_rng]
-    suffices ∀ (b : Bool), IsClosed ((fun (a : cantorSet) ↦ if cantorToDigits a i = 0 then 0 else 1) ⁻¹' {b}) by
-      sorry -- finite discrete topology
-    intro b
-    cases b
-    · have : ((fun a ↦ if cantorToDigits (↑a) i = 0 then 0 else 1) ⁻¹' {false} : Set cantorSet) =
-        ({x | cantorToDigits x i = 0} : Set cantorSet) := by
-        ext x
-        simp
-        intro
-        rfl
-      rw [this]
-      clear this
-      simp [cantorToDigits]
-      have : ({x | (3 : ℝ) * x ∈ preCantorSet i} : Set cantorSet) =
-          Subtype.val ⁻¹' {x | (3 : ℝ) * x ∈ preCantorSet i} := by
-        ext x
-        simp
-      rw [this]
-      clear this
-      apply IsClosed.preimage continuous_subtype_val
-      have : {x | 3 * x ∈ preCantorSet i} = (fun x ↦ 3⁻¹ * x) '' (preCantorSet i) := by
-        ext x
-        simp
-        constructor
-        · intro h
-          use 3 * x
-          simp [h]
-        · intro ⟨y, h1, h2⟩
-          rw [← h2]
-          convert h1
-          ring
-      rw [this]
-      clear this
-      rw [← Topology.IsClosedEmbedding.isClosed_iff_image_isClosed]
-      swap
-      · sorry
-      exact isClosed_preCantorSet i
-    · have : ((fun a ↦ if cantorToDigits (↑a) i = 0 then 0 else 1) ⁻¹' {true} : Set cantorSet) =
-        ({x | cantorToDigits x i = 2} : Set cantorSet) := by
-        ext x
-        simp
-        have := @cantorToDigits_ne_one x i
-        generalize cantorToDigits x i = u at this
-        constructor
-        · intro ⟨h, _⟩
-          fin_cases u <;> simp at this h ⊢
-        · intro h
-          refine ⟨?_, rfl⟩
-          fin_cases u <;> simp at this h ⊢
-      rw [this]
-      clear this
-      simp [cantorToDigits]
-      have : ({x | (3 : ℝ) * x ∉ preCantorSet i} : Set cantorSet) =
-          ({x | (3 : ℝ) * x - 2 ∈ preCantorSet i} : Set cantorSet) := by
-        ext ⟨x, h1⟩
-        simp [cantorSet] at h1
-        specialize h1 (i + 1)
-        simp at h1
-        simp
-        clear * - h1 -- TODO: why does simp duplicates hypothesis?
-        constructor
-        · intro h2
-          rcases h1 with ⟨y, h1, hx⟩ | ⟨y, h1, hx⟩ <;> subst hx
-          · ring_nf at h2
-            contradiction
-          · ring_nf
-            exact h1
-        · intro h2 h3
-          apply preCantorSet_subset_unitInterval at h2
-          apply preCantorSet_subset_unitInterval at h3
-          simp at h2 h3
-          linarith
-      rw [this]
-      clear this
-      have : ({x | (3 : ℝ) * x - 2 ∈ preCantorSet i} : Set cantorSet) =
-          Subtype.val ⁻¹' {x | (3 : ℝ) * x - 2 ∈ preCantorSet i} := by
-        ext x
-        simp
-      rw [this]
-      clear this
-      apply IsClosed.preimage continuous_subtype_val
-      have : {x | 3 * x - 2 ∈ preCantorSet i} = (fun x ↦ 3⁻¹ * (x + 2)) '' (preCantorSet i) := by
-        ext x
-        simp
-        constructor
-        · intro h
-          use 3 * x - 2
-          simp [h]
-        · intro ⟨y, h1, h2⟩
-          rw [← h2]
-          convert h1
-          ring
-      rw [this]
-      clear this
-      rw [← Topology.IsClosedEmbedding.isClosed_iff_image_isClosed]
-      swap
-      · sorry
-      exact isClosed_preCantorSet i
-  )
+  Continuous.homeoOfEquivCompactToT2 cantorSet_equiv_continuous
 
 /- Surjection from Cantor to Hilbert -/
 
