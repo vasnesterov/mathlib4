@@ -1,5 +1,7 @@
 import Mathlib
 
+universe u v w
+
 theorem preCantorSet_Antitone : Antitone preCantorSet := by
   intro n m h
   simp only [Set.le_eq_subset]
@@ -102,23 +104,32 @@ theorem ofDigitsTerm_Summable {b : ℕ} [NeZero b] (hb : 1 < b) {digits : ℕ �
   gcongr
   simp
 
-lemma ofDigits_partial_sum_ge {x : ℝ} {b : ℕ} [NeZero b] (hb : 1 < b) (hx : x ∈ Set.Icc 0 1)
-    {n : ℕ} :
+lemma ofDigits_reprReal_partial_sum_eq {x : ℝ} {b : ℕ} [NeZero b] (hb : 1 < b)
+    (hx : x ∈ Set.Ico 0 1) {n : ℕ} :
+    b^n * ∑ i ∈ Finset.range n, ofDigitsTerm (reprReal x b) i = ⌊b^n * x⌋ := by
+  sorry
+  -- induction n with
+  -- | zero => simp
+
+lemma ofDigits_reprReal_partial_sum_ge {x : ℝ} {b : ℕ} [NeZero b] (hb : 1 < b)
+    (hx : x ∈ Set.Ico 0 1) {n : ℕ} :
     x - (b⁻¹ : ℝ)^n ≤ ∑ i ∈ Finset.range n, ofDigitsTerm (reprReal x b) i := by
-  simp at hx
-  obtain ⟨hx1, hx2⟩ := hx
-  -- induction n does not help
-  sorry
+  have := ofDigits_reprReal_partial_sum_eq hb hx (n := n)
+  have h_le := Int.lt_floor_add_one (b^n * x)
+  rw [← this] at h_le
+  rw [← mul_le_mul_left (show 0 < (b : ℝ)^n by positivity)]
+  rw [mul_sub, inv_pow, mul_inv_cancel₀ (by positivity)]
+  linarith
 
-lemma ofDigits_partial_sum_le {x : ℝ} {b : ℕ} [NeZero b] (hb : 1 < b) {n : ℕ}
-    (hx : x ∈ Set.Icc 0 1) :
+lemma ofDigits_reprReal_partial_sum_le {x : ℝ} {b : ℕ} [NeZero b] (hb : 1 < b) {n : ℕ}
+    (hx : x ∈ Set.Ico 0 1) :
     ∑ i ∈ Finset.range n, ofDigitsTerm (reprReal x b) i ≤ x := by
-  simp at hx
-  obtain ⟨hx1, hx2⟩ := hx
-  -- induction n does not help
-  sorry
+  have := ofDigits_reprReal_partial_sum_eq hb hx (n := n)
+  have h_le := Int.floor_le (b^n * x)
+  rw [← this, mul_le_mul_iff_of_pos_left (by positivity)] at h_le
+  exact h_le
 
-theorem ofDigits_HasSum (x : ℝ) (b : ℕ) [NeZero b] (hb : 1 < b) (hx : x ∈ Set.Icc 0 1) :
+theorem ofDigits_HasSum (x : ℝ) (b : ℕ) [NeZero b] (hb : 1 < b) (hx : x ∈ Set.Ico 0 1) :
     HasSum (ofDigitsTerm (reprReal x b)) x := by
   rw [hasSum_iff_tendsto_nat_of_summable_norm]
   swap
@@ -135,12 +146,12 @@ theorem ofDigits_HasSum (x : ℝ) (b : ℕ) [NeZero b] (hb : 1 < b) (hx : x ∈ 
   · apply tendsto_const_nhds
   · intro n
     simp
-    have := ofDigits_partial_sum_ge hb hx (n := n)
+    have := ofDigits_reprReal_partial_sum_ge hb hx (n := n)
     simp at this
     linarith
   · intro n
     simp
-    exact ofDigits_partial_sum_le hb hx
+    exact ofDigits_reprReal_partial_sum_le hb hx
 
 noncomputable def ofDigits {b : ℕ} [NeZero b] (digits : ℕ → Fin b) : ℝ :=
   ∑' n, ofDigitsTerm digits n
@@ -183,7 +194,7 @@ theorem ofDigits_le_one {b : ℕ} [inst_neZero : NeZero b] {digits : ℕ → Fin
     · rify at hb
       linarith
 
-theorem reprReal_ofDigits (b : ℕ) [NeZero b] (x : ℝ) (hb : 1 < b) (hx : x ∈ Set.Icc 0 1) :
+theorem reprReal_ofDigits (b : ℕ) [NeZero b] (x : ℝ) (hb : 1 < b) (hx : x ∈ Set.Ico 0 1) :
     ofDigits (reprReal x b) = x := by
   simp [ofDigits]
   rw [← Summable.hasSum_iff]
@@ -627,8 +638,19 @@ noncomputable def cantorSet_homeo : cantorSet ≃ₜ (ℕ → Bool) :=
       exact isClosed_preCantorSet i
   )
 
+/- Surjection from Cantor to Hilbert -/
+
+def DiscreteTopology.equiv_to_homeomorph {X : Type u} {Y : Type v}
+    [TopologicalSpace X] [DiscreteTopology X]
+    [TopologicalSpace Y] [DiscreteTopology Y] (eq : X ≃ Y) : X ≃ₜ Y :=
+  eq.toHomeomorph (by simp)
+
+def finTwoHomeoBool : Fin 2 ≃ₜ Bool :=
+  DiscreteTopology.equiv_to_homeomorph finTwoEquiv
+
 noncomputable def fromBinary (b : ℕ → Bool) : unitInterval :=
-  let x : ℝ := ofDigits (finTwoEquiv.symm ∘ b)
+  let φ : (ℕ → Bool) ≃ₜ (ℕ → Fin 2) := Homeomorph.piCongrRight (fun _ ↦ finTwoHomeoBool.symm)
+  let x : ℝ := ofDigits (φ b)
   have hx : x ∈ Set.Icc 0 1 := by
     simp [x]
     constructor
@@ -636,19 +658,60 @@ noncomputable def fromBinary (b : ℕ → Bool) : unitInterval :=
     · exact ofDigits_le_one
   ⟨x, hx⟩
 
-theorem fromBinary_continuous : Continuous fromBinary := by
+theorem ofDigits_continuous {b : ℕ} [NeZero b] : Continuous (@ofDigits b _) := by
   sorry
+
+theorem fromBinary_continuous : Continuous fromBinary := by
+  unfold fromBinary
+  apply Continuous.subtype_mk
+  have : (fun x ↦ ofDigits ((Homeomorph.piCongrRight fun _ ↦ finTwoHomeoBool.symm) x)) =
+      ofDigits ∘ (Homeomorph.piCongrRight fun _ ↦ finTwoHomeoBool.symm) := by
+    ext
+    simp
+  rw [this, Homeomorph.comp_continuous_iff']
+  exact ofDigits_continuous
 
 theorem fromBinary_surjective : Function.Surjective fromBinary := by
   intro x
+  obtain ⟨x, hx⟩ := x
+  by_cases hx_one : x = 1
+  · use fun _ ↦ true
+    have : fromBinary (fun _ ↦ true) = ofDigits (b := 2) (fun _ ↦ 1) := by
+      simp [fromBinary, finTwoHomeoBool, DiscreteTopology.equiv_to_homeomorph]
+      congr
+    simp [Subtype.eq_iff, this, ofDigits, ofDigitsTerm, hx_one, pow_succ, ← inv_pow]
+    rw [Summable.tsum_mul_right]
+    · rw [tsum_geometric_inv_two]
+      simp
+    · convert summable_geometric_two
+      eta_expand
+      simp
+  replace hx : x ∈ Set.Ico 0 1 := by
+    simp at hx ⊢
+    exact ⟨hx.left, by apply hx.right.lt_of_ne' (by symm; simpa)⟩
   use finTwoEquiv ∘ (reprReal x 2)
   simp [fromBinary, ← Function.comp_assoc, reprReal_ofDigits]
+  conv => rhs; rw [← reprReal_ofDigits 2 x (by simp) hx]
+  congr
+  ext n
+  simp
+  congr
+  simp [finTwoHomeoBool, DiscreteTopology.equiv_to_homeomorph]
 
-noncomputable def cantorSet_product : cantorSet ≃ₜ (ℕ → cantorSet) := by
-  sorry
+def uncurry_homeomorph (X : Type u) (Y : Type v) (Z : Type w)
+    [TopologicalSpace Z] :
+    (X → Y → Z) ≃ₜ (X × Y → Z) where
+  toFun := Function.uncurry
+  invFun := Function.curry
+  left_inv := by exact congrFun rfl
+  right_inv := by exact congrFun rfl
 
-noncomputable def cantorToHilbert (x : cantorSet) : (ℕ → unitInterval) :=
-  fun i ↦ fromBinary (cantorSet_homeo (cantorSet_product x i))
+def cantorSet_pow : (ℕ → Bool) ≃ₜ (ℕ → ℕ → Bool) :=
+    (Homeomorph.piCongrLeft (Y := fun _ ↦ Bool) Nat.pairEquiv.symm).trans
+    (uncurry_homeomorph _ _ _).symm
+
+noncomputable def cantorToHilbert (x : ℕ → Bool) : ℕ → unitInterval :=
+  Pi.map (fun _ b ↦ fromBinary b) (cantorSet_pow x)
 
 theorem cantorToHilbert_continuous : Continuous cantorToHilbert := by
   unfold cantorToHilbert
@@ -658,10 +721,18 @@ theorem cantorToHilbert_continuous : Continuous cantorToHilbert := by
   fun_prop
 
 theorem cantorToHilbert_surjective : Function.Surjective cantorToHilbert := by
-  sorry
+  unfold cantorToHilbert
+  change Function.Surjective ((Pi.map (fun x b ↦ fromBinary b)) ∘ cantorSet_pow)
+  apply Function.Surjective.comp
+  · apply Function.Surjective.piMap
+    intro _
+    apply fromBinary_surjective
+  · exact Homeomorph.surjective cantorSet_pow
+
+/- Embedding to Hilber cube -/
 
 open Classical in
-noncomputable def embedHilbert (X : Type) [PseudoMetricSpace X] [CompactSpace X] :
+noncomputable def embedHilbert (X : Type*) [PseudoMetricSpace X] [CompactSpace X] :
     X → (ℕ → unitInterval) :=
   if h : Nonempty X then
     let s := TopologicalSpace.denseSeq X
@@ -684,12 +755,12 @@ noncomputable def embedHilbert (X : Type) [PseudoMetricSpace X] [CompactSpace X]
   else
     fun x i ↦ 0
 
-theorem embed_continuous {X : Type} [PseudoMetricSpace X] [CompactSpace X] :
+theorem embed_continuous {X : Type*} [PseudoMetricSpace X] [CompactSpace X] :
     Continuous (embedHilbert X) := by
   simp [embedHilbert]
   split_ifs <;> fun_prop
 
-theorem embed_injective {X : Type} [MetricSpace X] [CompactSpace X] :
+theorem embed_injective {X : Type*} [MetricSpace X] [CompactSpace X] :
     Function.Injective (embedHilbert X) := by
   intro x y hxy
   simp [embedHilbert] at hxy
@@ -719,18 +790,71 @@ theorem embed_injective {X : Type} [MetricSpace X] [CompactSpace X] :
   have := dist_triangle x (s i) y
   linarith [dist_nonneg (x := x) (y := y)]
 
-noncomputable def projectCantor (X : Type) [MetricSpace X] [CompactSpace X] : cantorSet → X :=
+/- Retraction to subset -/
+
+noncomputable def retractCantorSubset (X : Set (ℕ → Bool)) :
+    (ℕ → Bool) → (ℕ → Bool) :=
   sorry
 
-theorem projectCantor_continuous {X : Type} [MetricSpace X] [CompactSpace X] :
-    Continuous (projectCantor X) := by
+theorem retractCantorSubset_continuous {X : Set (ℕ → Bool)} (hX : IsClosed X) :
+    Continuous (retractCantorSubset X) := by
   sorry
 
-theorem projectCantor_surjective {X : Type} [MetricSpace X] [CompactSpace X] :
-    Function.Surjective (projectCantor X) := by
+theorem retractCantorSubset_surjective {X : Set (ℕ → Bool)} (hX : IsClosed X) :
+    Set.range (retractCantorSubset X) = X := by
+  sorry
+
+/- Retract to any metric space -/
+
+noncomputable def retractCantor (X : Type*) [MetricSpace X] [CompactSpace X] (x : cantorSet) : X :=
+  let KH : Set (ℕ → unitInterval) := Set.range (embedHilbert X)
+  let KC : Set (ℕ → Bool) := cantorToHilbert ⁻¹' KH
+  let x' := cantorSet_homeo x
+  let y := retractCantorSubset KC x'
+  let y' := cantorToHilbert y
+  sorry -- apply inverse to embedHilbert
+
+theorem retractCantor_continuous {X : Type*} [MetricSpace X] [CompactSpace X] :
+    Continuous (retractCantor X) := by
+  sorry
+
+theorem retractCantor_surjective {X : Type*} [MetricSpace X] [CompactSpace X] :
+    Function.Surjective (retractCantor X) := by
   sorry
 
 /- Peano curve -/
+
+
+-- lemma long_peano_curve (X : Type*) [MetricSpace X] [CompactSpace X] [i : TietzeExtension X] :
+--     ∃ f : C(ℝ, X), Set.univ = f '' cantorSet := by
+--   let g : C(cantorSet, X) :=
+--     ⟨retractCantor X, by apply retractCantor_continuous⟩
+--   have := @ContinuousMap.exists_restrict_eq ℝ _ _ cantorSet X _ i isClosed_cantorSet
+--   have := @ContinuousMap.exists_restrict_eq X _ _ _ _ _ i _ isClosed_cantorSet g
+--   obtain ⟨f, hf⟩ := ContinuousMap.exists_restrict_eq isClosed_cantorSet g
+--   use f
+--   have hg : Function.Surjective g := by
+--     simp [g]
+--     exact retractCantor_surjective
+--   ext y
+--   simp
+--   obtain ⟨x, hx⟩ := hg y
+--   use x
+--   have := ContinuousMap.restrict_apply f cantorSet x
+--   simp [← this, hf, hx]
+
+-- lemma peano_curve :
+--     ∃ f : C(unitInterval, unitInterval × unitInterval), Function.Surjective f := by
+--   obtain ⟨f, hf⟩ := long_peano_curve
+--   let g := ContinuousMap.restrict unitInterval f
+--   use g
+--   intro y
+--   rw [Set.ext_iff] at hf
+--   specialize hf y
+--   simp at hf
+--   obtain ⟨x, hx1, hx2⟩ := hf
+--   use ⟨x, by simp [cantorSet] at hx1; specialize hx1 0; simpa using hx1⟩
+--   simp [g, hx2]
 
 lemma unitInterval_eq_closedBall : unitInterval = Metric.closedBall 2⁻¹ 2⁻¹ := by
   ext x
@@ -745,12 +869,12 @@ instance : TietzeExtension unitInterval := by
 
 lemma long_peano_curve : ∃ f : C(ℝ, unitInterval × unitInterval), Set.univ = f '' cantorSet  := by
   let g : C(cantorSet, unitInterval × unitInterval) :=
-    ⟨projectCantor (unitInterval × unitInterval), by apply projectCantor_continuous⟩
+    ⟨retractCantor (unitInterval × unitInterval), by apply retractCantor_continuous⟩
   obtain ⟨f, hf⟩ := ContinuousMap.exists_restrict_eq isClosed_cantorSet g
   use f
   have hg : Function.Surjective g := by
     simp [g]
-    exact projectCantor_surjective
+    exact retractCantor_surjective
   ext y
   simp
   obtain ⟨x, hx⟩ := hg y
