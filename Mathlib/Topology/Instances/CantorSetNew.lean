@@ -2,6 +2,8 @@ import Mathlib
 
 universe u v w
 
+/- Cantor set lemmas -/
+
 theorem preCantorSet_Antitone : Antitone preCantorSet := by
   intro n m h
   simp only [Set.le_eq_subset]
@@ -47,6 +49,12 @@ theorem cantorSet_eq_union_small_cantorSets :
   change ⋂ n, preCantorSet n = ⋂ n, preCantorSet (n + 1)
   symm
   apply Antitone.iInter_nat_add preCantorSet_Antitone
+
+lemma preCantorSet_subset_unitInterval {n : ℕ} : preCantorSet n ⊆ Set.Icc 0 1 := by
+  rw [← preCantorSet_zero]
+  apply preCantorSet_Antitone (by simp)
+
+/- Representation of reals in positional system -/
 
 noncomputable def reprReal (x : ℝ) (b : ℕ) [NeZero b] : ℕ → Fin b :=
   fun i ↦ (⌊x * b^(i + 1)⌋ % b : ℤ)
@@ -484,160 +492,68 @@ theorem ofDigits_cantorToDigits {x : ℝ} (hx : x ∈ cantorSet) :
 
 noncomputable def cantorSet_equiv : cantorSet ≃ (ℕ → Bool) where
   toFun := fun ⟨x, h⟩ ↦ (cantorToBinary x).get
-  invFun (x : ℕ → Bool) :=
-    let a : ℕ → Fin 3 := fun i ↦ if x i then 2 else 0
-    let x : ℝ := ofDigits a
+  invFun (y : ℕ → Bool) :=
+    let x : ℝ := ofDigits (Pi.map (fun _ b ↦ cond b 2 0) y)
     have hx : x ∈ cantorSet := by
       simp [x]
       apply cantorRepr_ofDigits_mem_cantorSet
       intro n
-      simp [a]
-      split_ifs <;> simp
+      simp
+      cases y n <;> simp
     ⟨x, hx⟩
   left_inv := by
     intro ⟨x, hx⟩
     simp
-    convert ofDigits_cantorToDigits hx
-    simp [cantorToDigits]
+    exact ofDigits_cantorToDigits hx
   right_inv := by
-    intro b
+    intro y
     simp
-    set x := ofDigits (b := 3) fun i ↦ if b i = true then 2 else 0
+    set x := ofDigits (b := 3) (Pi.map (fun _ b ↦ cond b 2 0) y)
     have hx : x ∈ cantorSet := by
       apply cantorRepr_ofDigits_mem_cantorSet
       intro n
-      split_ifs <;> simp
+      simp
+      cases y n <;> simp
     have := ofDigits_cantorToDigits hx
     conv at this => rhs; unfold x
     apply cantorRepr_ofDigits_unique at this
     rotate_left
     · exact fun n ↦ cantorToDigits_ne_one
     · intro n
-      split_ifs <;> simp
+      simp
+      cases y n <;> simp
     ext n
     apply congrFun at this
     specialize this n
     simp [cantorToDigits] at this
-    split_ifs at this with h1 h2 <;> simp at this
-    · simp [h1, h2]
-    · rename_i h2
-      simp [h1, h2]
+    generalize (cantorToBinary x).get n = a at this
+    generalize y n = b at this
+    cases a <;> cases b <;> first | rfl | simp at this
 
 instance : CompactSpace cantorSet := by
   rw [← isCompact_iff_compactSpace]
   exact isCompact_cantorSet
 
-lemma preCantorSet_subset_unitInterval {n : ℕ} : preCantorSet n ⊆ Set.Icc 0 1 := by
-  rw [← preCantorSet_zero]
-  apply preCantorSet_Antitone (by simp)
+theorem ofDigits_continuous {b : ℕ} [NeZero b] : Continuous (@ofDigits b _) := by
+  sorry
 
-theorem cantorSet_equiv_continuous : Continuous cantorSet_equiv := by
-  apply continuous_pi
-  intro i
+theorem cantorSet_equiv_invFun_continuous : Continuous cantorSet_equiv.symm := by
   simp [cantorSet_equiv]
-  rw [continuous_discrete_rng]
-  suffices ∀ (b : Bool), IsClosed ((fun (a : cantorSet) ↦ if cantorToDigits a i = 0 then 0 else 1) ⁻¹' {b}) by
-    sorry -- finite discrete topology
-  intro b
-  cases b
-  · have : ((fun a ↦ if cantorToDigits (↑a) i = 0 then 0 else 1) ⁻¹' {false} : Set cantorSet) =
-      ({x | cantorToDigits x i = 0} : Set cantorSet) := by
-      ext x
-      simp
-      intro
-      rfl
-    rw [this]
-    clear this
-    simp [cantorToDigits]
-    have : ({x | (3 : ℝ) * x ∈ preCantorSet i} : Set cantorSet) =
-        Subtype.val ⁻¹' {x | (3 : ℝ) * x ∈ preCantorSet i} := by
-      ext x
-      simp
-    rw [this]
-    clear this
-    apply IsClosed.preimage continuous_subtype_val
-    have : {x | 3 * x ∈ preCantorSet i} = (fun x ↦ 3⁻¹ * x) '' (preCantorSet i) := by
-      ext x
-      simp
-      constructor
-      · intro h
-        use 3 * x
-        simp [h]
-      · intro ⟨y, h1, h2⟩
-        rw [← h2]
-        convert h1
-        ring
-    rw [this]
-    clear this
-    rw [← Topology.IsClosedEmbedding.isClosed_iff_image_isClosed]
-    swap
-    · sorry
-    exact isClosed_preCantorSet i
-  · have : ((fun a ↦ if cantorToDigits (↑a) i = 0 then 0 else 1) ⁻¹' {true} : Set cantorSet) =
-      ({x | cantorToDigits x i = 2} : Set cantorSet) := by
-      ext x
-      simp
-      have := @cantorToDigits_ne_one x i
-      generalize cantorToDigits x i = u at this
-      constructor
-      · intro ⟨h, _⟩
-        fin_cases u <;> simp at this h ⊢
-      · intro h
-        refine ⟨?_, rfl⟩
-        fin_cases u <;> simp at this h ⊢
-    rw [this]
-    clear this
-    simp [cantorToDigits]
-    have : ({x | (3 : ℝ) * x ∉ preCantorSet i} : Set cantorSet) =
-        ({x | (3 : ℝ) * x - 2 ∈ preCantorSet i} : Set cantorSet) := by
-      ext ⟨x, h1⟩
-      simp [cantorSet] at h1
-      specialize h1 (i + 1)
-      simp at h1
-      simp
-      clear * - h1 -- TODO: why does simp duplicates hypothesis?
-      constructor
-      · intro h2
-        rcases h1 with ⟨y, h1, hx⟩ | ⟨y, h1, hx⟩ <;> subst hx
-        · ring_nf at h2
-          contradiction
-        · ring_nf
-          exact h1
-      · intro h2 h3
-        apply preCantorSet_subset_unitInterval at h2
-        apply preCantorSet_subset_unitInterval at h3
-        simp at h2 h3
-        linarith
-    rw [this]
-    clear this
-    have : ({x | (3 : ℝ) * x - 2 ∈ preCantorSet i} : Set cantorSet) =
-        Subtype.val ⁻¹' {x | (3 : ℝ) * x - 2 ∈ preCantorSet i} := by
-      ext x
-      simp
-    rw [this]
-    clear this
-    apply IsClosed.preimage continuous_subtype_val
-    have : {x | 3 * x - 2 ∈ preCantorSet i} = (fun x ↦ 3⁻¹ * (x + 2)) '' (preCantorSet i) := by
-      ext x
-      simp
-      constructor
-      · intro h
-        use 3 * x - 2
-        simp [h]
-      · intro ⟨y, h1, h2⟩
-        rw [← h2]
-        convert h1
-        ring
-    rw [this]
-    clear this
-    rw [← Topology.IsClosedEmbedding.isClosed_iff_image_isClosed]
-    swap
-    · sorry
-    exact isClosed_preCantorSet i
-
+  apply Continuous.subtype_mk
+  change Continuous (ofDigits ∘ (fun x ↦ Pi.map (fun x b ↦ bif b then 2 else 0) x))
+  apply Continuous.comp
+  · apply ofDigits_continuous
+  have : (fun x ↦ Pi.map (fun (_ : ℕ) b ↦ bif b then (2 : Fin 3) else 0) x) =
+      (Pi.map (fun x b ↦ bif b then (2 : Fin 3) else 0)) := by
+    eta_expand
+    rfl
+  rw [this]
+  apply Continuous.piMap
+  intro _
+  exact continuous_of_discreteTopology
 
 noncomputable def cantorSet_homeo : cantorSet ≃ₜ (ℕ → Bool) :=
-  Continuous.homeoOfEquivCompactToT2 cantorSet_equiv_continuous
+  (Continuous.homeoOfEquivCompactToT2 cantorSet_equiv_invFun_continuous).symm
 
 /- Surjection from Cantor to Hilbert -/
 
@@ -658,9 +574,6 @@ noncomputable def fromBinary (b : ℕ → Bool) : unitInterval :=
     · exact ofDigits_nonneg
     · exact ofDigits_le_one
   ⟨x, hx⟩
-
-theorem ofDigits_continuous {b : ℕ} [NeZero b] : Continuous (@ofDigits b _) := by
-  sorry
 
 theorem fromBinary_continuous : Continuous fromBinary := by
   unfold fromBinary
