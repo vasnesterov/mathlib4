@@ -112,12 +112,39 @@ theorem ofDigitsTerm_Summable {b : ℕ} [NeZero b] (hb : 1 < b) {digits : ℕ �
   gcongr
   simp
 
-lemma ofDigits_reprReal_partial_sum_eq {x : ℝ} {b : ℕ} [NeZero b] (hb : 1 < b)
+#check Fin.val_intCast
+
+lemma ofDigits_reprReal_partial_sum_eq {x : ℝ} {b : ℕ} [inst : NeZero b] (hb : 1 < b)
     (hx : x ∈ Set.Ico 0 1) {n : ℕ} :
     b^n * ∑ i ∈ Finset.range n, ofDigitsTerm (reprReal x b) i = ⌊b^n * x⌋ := by
-  sorry
-  -- induction n with
-  -- | zero => simp
+  induction n with
+  | zero =>
+    simp
+    sorry
+  | succ n ih =>
+    rw [Finset.sum_range_succ, mul_add, pow_succ', mul_assoc, ih]
+    simp only [ofDigitsTerm, reprReal]
+    rw [show x * (b : ℝ) ^ (n + 1) = b * (b^n * x) by ring]
+    conv => rhs; rw [mul_assoc]
+    set y := (b : ℝ) ^ n * x
+    ring_nf
+    move_mul [← (b : ℝ)⁻¹]
+    have hb_zero : (b : ℝ) ≠ 0 := by
+      obtain ⟨h⟩ := inst
+      simpa using h
+    simp [inv_mul_cancel₀ (hb_zero)]
+    move_mul [← ((b : ℝ)^n)⁻¹]
+    rw [inv_mul_cancel₀ (by positivity)]
+    simp
+    norm_cast
+    have : ⌊y⌋ = ⌊b * y⌋ / b := by
+      sorry
+    rw [this]
+    conv => rhs; rw [← Int.emod_add_ediv ⌊(b : ℝ) * y⌋ b]
+    congr
+
+
+    sorry
 
 lemma ofDigits_reprReal_partial_sum_ge {x : ℝ} {b : ℕ} [NeZero b] (hb : 1 < b)
     (hx : x ∈ Set.Ico 0 1) {n : ℕ} :
