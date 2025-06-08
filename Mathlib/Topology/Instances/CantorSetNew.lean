@@ -57,15 +57,7 @@ lemma preCantorSet_subset_unitInterval {n : ℕ} : preCantorSet n ⊆ Set.Icc 0 
 /- Representation of reals in positional system -/
 
 noncomputable def reprReal (x : ℝ) (b : ℕ) [NeZero b] : ℕ → Fin b :=
-  fun i ↦ (⌊x * b^(i + 1)⌋ % b : ℤ)
-
-example : reprReal (1/4) 3 0 = 0 := by
-  simp [reprReal]
-  norm_num
-
-example : reprReal (1/4) 3 1 = 2 := by
-  simp [reprReal]
-  norm_num
+  fun i ↦ Fin.ofNat _ <| ⌊x * b^(i + 1)⌋₊ % b
 
 noncomputable def ofDigitsTerm {b : ℕ} [NeZero b] (digits : ℕ → Fin b) : ℕ → ℝ :=
   fun i ↦ (digits i) * (b⁻¹ : ℝ)^(i + 1)
@@ -83,20 +75,19 @@ theorem ofDigitsTerm_le {b : ℕ} [NeZero b] {digits : ℕ → Fin b} {n : ℕ} 
   norm_cast
   omega
 
--- todo : do we need this?
--- theorem ofDigitsTerm_lt {b : ℕ} [NeZero b] {digits : ℕ → Fin b} {n : ℕ} (hb : 0 < b) :
---     ofDigitsTerm digits n < (b⁻¹ : ℝ)^n := by
---   calc
---     _ ≤ _ := ofDigitsTerm_le hb
---     _ < _ := by
---       rw [pow_succ]
---       move_mul [(b⁻¹ : ℝ)^n]
---       apply mul_lt_of_lt_one_left
---       · positivity
---       sorry
-
-theorem ofDigitsTerm_Summable {b : ℕ} [NeZero b] (hb : 1 < b) {digits : ℕ → Fin b} :
+theorem ofDigitsTerm_Summable {b : ℕ} [inst : NeZero b] {digits : ℕ → Fin b} :
     Summable (ofDigitsTerm digits) := by
+  by_cases hb : b = 1
+  · subst hb
+    have : ofDigitsTerm digits = 0 := by
+      ext i
+      simp [ofDigitsTerm]
+    simp [this]
+    eta_expand
+    simp [summable_const_iff]
+  replace hb : 1 < b := by
+    cases inst
+    omega
   have h1 := summable_geometric_of_lt_one (r := (b⁻¹ : ℝ)) (by simp)
     (by rify at hb; exact inv_lt_one_of_one_lt₀ hb)
   apply Summable.mul_left (a := (b : ℝ)) at h1
@@ -111,82 +102,6 @@ theorem ofDigitsTerm_Summable {b : ℕ} [NeZero b] (hb : 1 < b) {digits : ℕ �
   simp [ofDigitsTerm]
   gcongr
   simp
-
-#check Fin.val_intCast
-
-lemma ofDigits_reprReal_partial_sum_eq {x : ℝ} {b : ℕ} [inst : NeZero b] (hb : 1 < b)
-    (hx : x ∈ Set.Ico 0 1) {n : ℕ} :
-    b^n * ∑ i ∈ Finset.range n, ofDigitsTerm (reprReal x b) i = ⌊b^n * x⌋ := by
-  induction n with
-  | zero =>
-    simp
-    sorry
-  | succ n ih =>
-    rw [Finset.sum_range_succ, mul_add, pow_succ', mul_assoc, ih]
-    simp only [ofDigitsTerm, reprReal]
-    rw [show x * (b : ℝ) ^ (n + 1) = b * (b^n * x) by ring]
-    conv => rhs; rw [mul_assoc]
-    set y := (b : ℝ) ^ n * x
-    ring_nf
-    move_mul [← (b : ℝ)⁻¹]
-    have hb_zero : (b : ℝ) ≠ 0 := by
-      obtain ⟨h⟩ := inst
-      simpa using h
-    simp [inv_mul_cancel₀ (hb_zero)]
-    move_mul [← ((b : ℝ)^n)⁻¹]
-    rw [inv_mul_cancel₀ (by positivity)]
-    simp
-    norm_cast
-    have : ⌊y⌋ = ⌊b * y⌋ / b := by
-      sorry
-    rw [this]
-    conv => rhs; rw [← Int.emod_add_ediv ⌊(b : ℝ) * y⌋ b]
-    congr
-
-
-    sorry
-
-lemma ofDigits_reprReal_partial_sum_ge {x : ℝ} {b : ℕ} [NeZero b] (hb : 1 < b)
-    (hx : x ∈ Set.Ico 0 1) {n : ℕ} :
-    x - (b⁻¹ : ℝ)^n ≤ ∑ i ∈ Finset.range n, ofDigitsTerm (reprReal x b) i := by
-  have := ofDigits_reprReal_partial_sum_eq hb hx (n := n)
-  have h_le := Int.lt_floor_add_one (b^n * x)
-  rw [← this] at h_le
-  rw [← mul_le_mul_left (show 0 < (b : ℝ)^n by positivity)]
-  rw [mul_sub, inv_pow, mul_inv_cancel₀ (by positivity)]
-  linarith
-
-lemma ofDigits_reprReal_partial_sum_le {x : ℝ} {b : ℕ} [NeZero b] (hb : 1 < b) {n : ℕ}
-    (hx : x ∈ Set.Ico 0 1) :
-    ∑ i ∈ Finset.range n, ofDigitsTerm (reprReal x b) i ≤ x := by
-  have := ofDigits_reprReal_partial_sum_eq hb hx (n := n)
-  have h_le := Int.floor_le (b^n * x)
-  rw [← this, mul_le_mul_iff_of_pos_left (by positivity)] at h_le
-  exact h_le
-
-theorem ofDigits_HasSum (x : ℝ) (b : ℕ) [NeZero b] (hb : 1 < b) (hx : x ∈ Set.Ico 0 1) :
-    HasSum (ofDigitsTerm (reprReal x b)) x := by
-  rw [hasSum_iff_tendsto_nat_of_summable_norm]
-  swap
-  · conv => arg 1; ext i; simp; rw [abs_of_nonneg (by simp [ofDigitsTerm]; positivity)]
-    exact ofDigitsTerm_Summable hb
-  rw [← tendsto_sub_nhds_zero_iff]
-  apply tendsto_of_tendsto_of_tendsto_of_le_of_le (g := fun n ↦ -(b⁻¹ : ℝ)^n) (h := 0)
-  · rw [show (0 : ℝ) = -0 by simp]
-    apply Filter.Tendsto.neg
-    apply tendsto_pow_atTop_nhds_zero_of_abs_lt_one
-    rw [abs_of_nonneg (by positivity)]
-    rify at hb
-    exact inv_lt_one_of_one_lt₀ hb
-  · apply tendsto_const_nhds
-  · intro n
-    simp
-    have := ofDigits_reprReal_partial_sum_ge hb hx (n := n)
-    simp at this
-    linarith
-  · intro n
-    simp
-    exact ofDigits_reprReal_partial_sum_le hb hx
 
 noncomputable def ofDigits {b : ℕ} [NeZero b] (digits : ℕ → Fin b) : ℝ :=
   ∑' n, ofDigitsTerm digits n
@@ -214,7 +129,7 @@ theorem ofDigits_le_one {b : ℕ} [inst_neZero : NeZero b] {digits : ℕ → Fin
     apply Summable.mul_left
     apply summable_geometric_of_lt_one (by simp)
       (by rify at hb; exact inv_lt_one_of_one_lt₀ hb)
-  convert Summable.tsum_mono (ofDigitsTerm_Summable hb) hg_summable _
+  convert Summable.tsum_mono (ofDigitsTerm_Summable) hg_summable _
   · simp [g, tsum_mul_left, ← inv_pow]
     rw [tsum_geometric_of_lt_one hb_inv_nonneg hb_inv_lt_one, mul_inv_cancel₀]
     linarith
@@ -229,12 +144,128 @@ theorem ofDigits_le_one {b : ℕ} [inst_neZero : NeZero b] {digits : ℕ → Fin
     · rify at hb
       linarith
 
+theorem ofDigits_partail_sum_eq {b : ℕ} [NeZero b] (a : ℕ → Fin b) (n : ℕ) :
+    ofDigits a = (∑ i ∈ Finset.range n, ofDigitsTerm a i) +
+      ((b : ℝ)^n)⁻¹ * ofDigits (fun i ↦ a (i + n)) := by
+  simp [ofDigits]
+  rw [← Summable.sum_add_tsum_nat_add n ofDigitsTerm_Summable,
+    ← Summable.tsum_mul_left _ ofDigitsTerm_Summable]
+  congr
+  ext i
+  simp [ofDigitsTerm]
+  ring
+
+theorem ofDigits_close {b : ℕ} [NeZero b] {x y : ℕ → Fin b} {n : ℕ} (hxy : ∀ i < n, x i = y i) :
+    |ofDigits x - ofDigits y| ≤ ((b : ℝ)^n)⁻¹ := by
+  rw [ofDigits_partail_sum_eq x n, ofDigits_partail_sum_eq y n]
+  have : ∑ i ∈ Finset.range n, ofDigitsTerm x i = ∑ i ∈ Finset.range n, ofDigitsTerm y i := by
+    apply Finset.sum_congr rfl
+    intro i hi
+    simp at hi
+    simp [ofDigitsTerm, hxy i hi]
+  simp [this]
+  rw [← mul_sub, abs_mul, abs_of_nonneg (by positivity)]
+  apply mul_le_of_le_one_right (by positivity)
+  rw [abs_le']
+  constructor <;> linarith [ofDigits_nonneg (digits := fun i ↦ x (i + n)),
+    ofDigits_nonneg (digits := fun i ↦ y (i + n)), ofDigits_le_one (digits := fun i ↦ x (i + n)),
+    ofDigits_le_one (digits := fun i ↦ y (i + n))]
+
+theorem kek {α : Type u} [Semiring α] [LinearOrder α] [FloorSemiring α] {y : α} {b : ℕ}
+    (hy : 0 ≤ y) (hb : 0 < b) : ⌊b * y⌋₊ / b = ⌊y⌋₊ := by
+  symm
+  rw [Nat.floor_eq_iff hy]
+  constructor
+  · sorry
+  · sorry
+
+lemma ofDigits_reprReal_partial_sum_eq {x : ℝ} {b : ℕ} [inst : NeZero b] (hb : 1 < b)
+    (hx : x ∈ Set.Ico 0 1) {n : ℕ} :
+    b^n * ∑ i ∈ Finset.range n, ofDigitsTerm (reprReal x b) i = ⌊b^n * x⌋₊ := by
+  induction n with
+  | zero =>
+    simp
+    simp at hx
+    norm_cast
+    symm
+    rw [Nat.floor_eq_zero]
+    exact hx.right
+  | succ n ih =>
+    rw [Finset.sum_range_succ, mul_add, pow_succ', mul_assoc, ih]
+    simp only [ofDigitsTerm, reprReal]
+    rw [show x * (b : ℝ) ^ (n + 1) = b * (b^n * x) by ring]
+    conv => rhs; rw [mul_assoc]
+    set y := (b : ℝ) ^ n * x
+    ring_nf
+    move_mul [← (b : ℝ)⁻¹]
+    have hb_zero : (b : ℝ) ≠ 0 := by
+      obtain ⟨h⟩ := inst
+      simpa using h
+    simp [inv_mul_cancel₀ (hb_zero)]
+    move_mul [← ((b : ℝ)^n)⁻¹]
+    rw [inv_mul_cancel₀ (by positivity)]
+    simp
+    norm_cast
+    have : ⌊y⌋₊ = ⌊b * y⌋₊ / b := by
+      symm
+      apply kek
+      · simp [y]
+        apply mul_nonneg
+        · positivity
+        · simp at hx
+          exact hx.left
+      · omega
+    rw [this]
+    conv => rhs; rw [← Nat.mod_add_div ⌊(b : ℝ) * y⌋₊ b]
+
+lemma ofDigits_reprReal_partial_sum_ge {x : ℝ} {b : ℕ} [NeZero b] (hb : 1 < b)
+    (hx : x ∈ Set.Ico 0 1) {n : ℕ} :
+    x - (b⁻¹ : ℝ)^n ≤ ∑ i ∈ Finset.range n, ofDigitsTerm (reprReal x b) i := by
+  have := ofDigits_reprReal_partial_sum_eq hb hx (n := n)
+  have h_le := Nat.lt_floor_add_one (b^n * x)
+  rw [← this] at h_le
+  rw [← mul_le_mul_left (show 0 < (b : ℝ)^n by positivity)]
+  rw [mul_sub, inv_pow, mul_inv_cancel₀ (by positivity)]
+  linarith
+
+lemma ofDigits_reprReal_partial_sum_le {x : ℝ} {b : ℕ} [NeZero b] (hb : 1 < b) {n : ℕ}
+    (hx : x ∈ Set.Ico 0 1) :
+    ∑ i ∈ Finset.range n, ofDigitsTerm (reprReal x b) i ≤ x := by
+  have := ofDigits_reprReal_partial_sum_eq hb hx (n := n)
+  have h_le := Nat.floor_le (a := b^n * x) (by simp at hx; apply mul_nonneg _ hx.left; positivity)
+  rw [← this, mul_le_mul_iff_of_pos_left (by positivity)] at h_le
+  exact h_le
+
+theorem ofDigits_HasSum (x : ℝ) (b : ℕ) [NeZero b] (hb : 1 < b) (hx : x ∈ Set.Ico 0 1) :
+    HasSum (ofDigitsTerm (reprReal x b)) x := by
+  rw [hasSum_iff_tendsto_nat_of_summable_norm]
+  swap
+  · conv => arg 1; ext i; simp; rw [abs_of_nonneg (by simp [ofDigitsTerm]; positivity)]
+    exact ofDigitsTerm_Summable
+  rw [← tendsto_sub_nhds_zero_iff]
+  apply tendsto_of_tendsto_of_tendsto_of_le_of_le (g := fun n ↦ -(b⁻¹ : ℝ)^n) (h := 0)
+  · rw [show (0 : ℝ) = -0 by simp]
+    apply Filter.Tendsto.neg
+    apply tendsto_pow_atTop_nhds_zero_of_abs_lt_one
+    rw [abs_of_nonneg (by positivity)]
+    rify at hb
+    exact inv_lt_one_of_one_lt₀ hb
+  · apply tendsto_const_nhds
+  · intro n
+    simp
+    have := ofDigits_reprReal_partial_sum_ge hb hx (n := n)
+    simp at this
+    linarith
+  · intro n
+    simp
+    exact ofDigits_reprReal_partial_sum_le hb hx
+
 theorem reprReal_ofDigits (b : ℕ) [NeZero b] (x : ℝ) (hb : 1 < b) (hx : x ∈ Set.Ico 0 1) :
     ofDigits (reprReal x b) = x := by
   simp [ofDigits]
   rw [← Summable.hasSum_iff]
   · exact ofDigits_HasSum x b hb hx
-  · exact ofDigitsTerm_Summable hb
+  · exact ofDigitsTerm_Summable
 
 theorem cantorRepr_HasSum_unique {a b : ℕ → Fin 3} {x : ℝ}
     (ha1 : HasSum (ofDigitsTerm a) x)
@@ -306,13 +337,11 @@ theorem cantorRepr_ofDigits_unique {a b : ℕ → Fin 3}
   have ha2 : HasSum (ofDigitsTerm a) x := by
     simp [x, ofDigits]
     apply Summable.hasSum
-    apply ofDigitsTerm_Summable
-    norm_num
+    exact ofDigitsTerm_Summable
   have hb2 : HasSum (ofDigitsTerm b) x := by
     simp [h, ofDigits]
     apply Summable.hasSum
-    apply ofDigitsTerm_Summable
-    norm_num
+    exact ofDigitsTerm_Summable
   apply cantorRepr_HasSum_unique ha2 ha hb2 hb
 
 theorem cantorRepr_HasSum_mem_cantorSet {a : ℕ → Fin 3} {x : ℝ}
@@ -377,8 +406,7 @@ theorem cantorRepr_ofDigits_mem_cantorSet {a : ℕ → Fin 3}
   have : HasSum (ofDigitsTerm a) (ofDigits a) := by
     simp [ofDigits]
     apply Summable.hasSum
-    apply ofDigitsTerm_Summable
-    norm_num
+    exact ofDigitsTerm_Summable
   exact cantorRepr_HasSum_mem_cantorSet this h
 
 /-- Generates the first digit and scales x back to [0, 1]. -/
@@ -500,7 +528,7 @@ theorem ofDigits_cantorToDigits {x : ℝ} (hx : x ∈ cantorSet) :
   rw [hasSum_iff_tendsto_nat_of_summable_norm]
   swap
   · conv => arg 1; ext i; simp; rw [abs_of_nonneg (by simp [ofDigitsTerm])]
-    exact ofDigitsTerm_Summable (show 1 < 3 by norm_num)
+    exact ofDigitsTerm_Summable
   apply tendsto_of_tendsto_of_tendsto_of_le_of_le (g := fun n ↦ x - (3⁻¹ : ℝ)^n) (h := fun _ ↦ x)
   · rw [← tendsto_sub_nhds_zero_iff]
     simp only [sub_sub_cancel_left]
@@ -561,8 +589,77 @@ instance : CompactSpace cantorSet := by
   rw [← isCompact_iff_compactSpace]
   exact isCompact_cantorSet
 
-theorem ofDigits_continuous {b : ℕ} [NeZero b] : Continuous (@ofDigits b _) := by
-  sorry
+theorem ofDigits_continuous {b : ℕ} [inst : NeZero b] : Continuous (@ofDigits b _) := by
+  by_cases hb : b = 1
+  · subst hb
+    exact continuous_of_discreteTopology
+  replace hb : 1 < b := by
+    cases inst
+    omega
+  have h_fin_emb : Topology.IsEmbedding (@Fin.val b) := by
+    constructor
+    · -- TODO : generalize this
+      constructor
+      ext S
+      simp
+      rw [isOpen_induced_iff]
+      use Fin.val '' S
+      simp
+      ext i
+      simp
+      constructor
+      · intro ⟨x, h1, h2⟩
+        apply Fin.eq_of_val_eq at h2
+        simpa [← h2]
+      · intro hi
+        use i
+    · exact Fin.val_injective
+  let instMetricSpaceFin : MetricSpace (Fin b) := Topology.IsEmbedding.comapMetricSpace _ h_fin_emb
+  have h_fin_iso : Isometry (@Fin.val b) := Topology.IsEmbedding.to_isometry _
+  let instMetricSpace : MetricSpace (ℕ → Fin b) := PiCountable.metricSpace
+  rw [Metric.continuous_iff]
+  intro a ε hε
+  obtain ⟨n, hn⟩ : ∃ n, ((b : ℝ)^n)⁻¹ < ε := by
+    simp_rw [← inv_pow]
+    have := tendsto_pow_atTop_nhds_zero_of_abs_lt_one (r := (b : ℝ)⁻¹)
+      (by rify at hb; rw [abs_of_nonneg (by positivity)]; exact inv_lt_one_of_one_lt₀ hb)
+    obtain ⟨n, hn⟩ := (this.eventually_le_const hε).frequently.exists
+    use n + 1
+    rw [pow_succ]
+    rw [show ε = ε * 1 by simp]
+    exact mul_lt_mul_of_pos_of_nonneg hn (by rify at hb; exact inv_lt_one_of_one_lt₀ hb)
+      (by positivity) (by norm_num)
+  use (2^n)⁻¹
+  constructor
+  · simp
+  intro a' ha'
+  unfold dist instMetricSpace at ha'
+  simp [PiCountable.metricSpace, PiCountable.dist] at ha'
+  have h : ∀ i < n, a' i = a i := by
+    by_contra! h
+    obtain ⟨j, hj, h⟩ := h
+    replace h : 1 ≤ dist (a' j) (a j) := by
+      rw [← h_fin_iso.dist_eq]
+      apply Fin.val_ne_of_ne at h
+      exact Nat.pairwise_one_le_dist h
+    have : ((2 : ℝ) ^ j)⁻¹ ≤ ∑' (i : ℕ), min ((2 : ℝ) ^ i)⁻¹ (dist (a' i) (a i)) := by
+      have : ((2 : ℝ) ^ j)⁻¹ = min ((2 : ℝ) ^ j)⁻¹ (dist (a' j) (a j)) := by
+        simp
+        suffices ((2 : ℝ) ^ j)⁻¹ ≤ 1 by linarith
+        rw [inv_le_one₀ (by positivity)]
+        apply one_le_pow₀
+        norm_num
+      rw [this]
+      apply Summable.le_tsum (f := fun i ↦ min ((2 : ℝ) ^ i)⁻¹ (dist (a' i) (a i)))
+      · convert PiCountable.dist_summable a' a
+        simp
+      · intro i hi
+        positivity
+    suffices ((2 : ℝ) ^ n)⁻¹ < ((2 : ℝ) ^ j)⁻¹ by linarith
+    exact inv_pow_lt_inv_pow_of_lt (by norm_num) hj
+  apply ofDigits_close at h
+  simp [dist]
+  linarith
 
 theorem cantorSet_equiv_invFun_continuous : Continuous cantorSet_equiv.symm := by
   simp [cantorSet_equiv]
