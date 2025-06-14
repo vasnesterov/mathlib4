@@ -807,130 +807,60 @@ theorem embed_injective {X : Type*} [MetricSpace X] [CompactSpace X] :
   have := dist_triangle x (s i) y
   linarith [dist_nonneg (x := x) (y := y)]
 
+theorem exists_closed_embedding_to_hilbert (X : Type*) [PseudoMetricSpace X] [CompactSpace X] :
+    ∃ f : X → (ℕ → unitInterval), Topology.IsClosedEmbedding f := by
+  sorry -- TODO: refactor the above to this
+
 /- Retraction to subset -/
 
-open PiNat
+attribute [local instance] PiNat.metricSpace
 
-theorem exists_mem {X : Set (ℕ → Bool)} (hX : IsClosed X) (x : ℕ → Bool) : ∃ y ∈ X,
-    (∀ y' ∈ X, ∀ n, y' ∈ cylinder x n → y ∈ cylinder x n) ∧
-    (∀ y' ∈ X, (∀ n, y ∈ cylinder x n → y' ∈ cylinder x n) → y ≤ y') := by
-  by_cases hx_mem : x ∈ X
-  · use x, hx_mem
-    sorry
-  · sorry
-
-noncomputable def retractCantorSubset {X : Set (ℕ → Bool)} (hX : IsClosed X) (x : ℕ → Bool) :
-    ℕ → Bool :=
-  (exists_mem hX x).choose
-
-theorem retractCantorSubset_spec {X : Set (ℕ → Bool)} (hX : IsClosed X) (x : ℕ → Bool) :
-    (retractCantorSubset hX x) ∈ X ∧
-    (∀ y' ∈ X, ∀ n, y' ∈ cylinder x n → (retractCantorSubset hX x) ∈ cylinder x n) ∧
-    (∀ y' ∈ X, (∀ n, (retractCantorSubset hX x) ∈ cylinder x n → y' ∈ cylinder x n) →
-      (retractCantorSubset hX x) ≤ y') :=
-  (exists_mem hX x).choose_spec
-
-theorem retractCantorSubset_of_mem {X : Set (ℕ → Bool)} (hX : IsClosed X) {x : ℕ → Bool}
-    (h : x ∈ X) : retractCantorSubset hX x = x := by
-  obtain ⟨_, h_longest, _⟩ := retractCantorSubset_spec hX x
-  ext i
-  specialize h_longest x h (i + 1)
-  simp [cylinder] at h_longest
-  rw [h_longest i (by simp)]
-
-lemma Bool.toNat_injective : Function.Injective Bool.toNat := by
-  decide
-
-theorem retractCantorSubset_continuous {X : Set (ℕ → Bool)} (hX : IsClosed X) :
-    Continuous (retractCantorSubset hX) := by
-  have h_fin_emb : Topology.IsEmbedding Bool.toNat := by
-    constructor
-    · -- TODO : generalize this
-      constructor
-      ext S
-      simp
-      rw [isOpen_induced_iff]
-      use Bool.toNat '' S
-      simp
-    · exact Bool.toNat_injective
-  let instMetricSpaceFin : MetricSpace Bool := Topology.IsEmbedding.comapMetricSpace _ h_fin_emb
-  have h_fin_iso : Isometry Bool.toNat := Topology.IsEmbedding.to_isometry _
-  let instMetricSpace : MetricSpace (ℕ → Bool) := PiNat.metricSpace
-  rw [Metric.continuous_iff]
-  intro b ε hε
-  obtain ⟨n, hn⟩ : ∃ n, (1/2)^n < ε := by
-    have := tendsto_pow_atTop_nhds_zero_of_abs_lt_one (r := 1/2)
-      (by rw [abs_of_nonneg (by norm_num)]; norm_num)
-    obtain ⟨n, hn⟩ := (this.eventually_le_const hε).frequently.exists
-    use n + 1
-    rw [pow_succ]
-    rw [show ε = ε * 1 by simp]
-    exact mul_lt_mul_of_pos_of_nonneg hn (by norm_num)
-      (by positivity) (by norm_num)
-  use (1/2)^(n + 1)
-  refine ⟨by norm_num, ?_⟩
-  intro b' hb'
-  apply le_of_lt at hb'
-  rw [← PiNat.mem_cylinder_iff_dist_le] at hb'
-  obtain ⟨h_mem', h_longest', h_min'⟩ := retractCantorSubset_spec hX b'
-  obtain ⟨h_mem, h_longest, h_min⟩ := retractCantorSubset_spec hX b
-  set x := retractCantorSubset hX b
-  set x' := retractCantorSubset hX b'
-  suffices dist x' x ≤ (1 / 2)^(n + 1) by
-    rw [pow_succ] at this
-    linarith
-  rw [← PiNat.mem_cylinder_iff_dist_le]
-  by_cases hbx : x ∈ cylinder b (n + 1)
-  · have hb'x' : x' ∈ cylinder b' (n + 1) := by
-      apply h_longest' x h_mem
-      rw [PiNat.mem_cylinder_iff_eq] at hbx
-      rwa [← hbx, PiNat.mem_cylinder_comm] at hb'
-    rw [PiNat.mem_cylinder_iff_eq] at hbx hb'
-    rwa [hbx, ← hb']
-  by_cases hb'x' : x' ∈ cylinder b' (n + 1)
-  · have hbx : x ∈ cylinder b (n + 1) := by
-      apply h_longest x' h_mem'
-      rw [PiNat.mem_cylinder_iff_eq] at hb'x'
-      rw [PiNat.mem_cylinder_comm, hb'x']
-      rwa [PiNat.mem_cylinder_comm] at hb'
-    rw [PiNat.mem_cylinder_iff_eq] at hbx hb'
-    rwa [hbx, ← hb']
-  suffices x = x' by simp [this]
-  apply le_antisymm
-  · apply h_min _ h_mem'
-    intro m h
-    have hmn : m < n + 1 := by
-      contrapose! hbx
-      exact PiNat.cylinder_anti _ hbx h
-    have hbb'_m : b' ∈ cylinder b m :=
-      PiNat.cylinder_anti _ hmn.le hb'
-    rw [PiNat.mem_cylinder_iff_eq] at hbb'_m
-    rw [← hbb'_m]
-    exact h_longest' x h_mem m (by rwa [hbb'_m])
-  · apply h_min' _ h_mem
-    intro m h
-    have hmn : m < n + 1 := by
-      contrapose! hb'x'
-      exact PiNat.cylinder_anti _ hb'x' h
-    have hbb'_m : b' ∈ cylinder b m := PiNat.cylinder_anti _ hmn.le hb'
-    rw [PiNat.mem_cylinder_iff_eq] at hbb'_m
-    rw [hbb'_m]
-    apply h_longest x' h_mem'
-    rwa [← hbb'_m]
-
-theorem retractCantorSubset_surjective {X : Set (ℕ → Bool)} (hX : IsClosed X) :
-    Set.range (retractCantorSubset hX) = X := by
-  ext x
-  constructor
-  · intro ⟨y, hy⟩
-    subst hy
-    exact (retractCantorSubset_spec hX y).left
-  · intro hx
-    simp
-    use x
-    rw [retractCantorSubset_of_mem _ hx]
+theorem exists_retractionCantorSet {X : Set (ℕ → Bool)} (h_closed : IsClosed X)
+    (h_nonempty : X.Nonempty) : ∃ f : (ℕ → Bool) → (ℕ → Bool), Continuous f ∧ Set.range f = X := by
+  rcases PiNat.exists_lipschitz_retraction_of_isClosed h_closed h_nonempty with ⟨f, fs, frange, hf⟩
+  exact ⟨f, hf.continuous, frange⟩
 
 /- Retract to any metric space -/
+
+theorem exists_nat_bool_continuous_surjective_of_compact' (X : Type*) [Nonempty X] [MetricSpace X]
+    [CompactSpace X] : ∃ f : (ℕ → Bool) → X, Continuous f ∧ Function.Surjective f := by
+  let K := Function.Pullback (embedHilbert X) cantorToHilbert
+
+
+theorem exists_nat_bool_continuous_surjective_of_compact (X : Type*) [Nonempty X] [MetricSpace X]
+    [CompactSpace X] : ∃ f : (ℕ → Bool) → X, Continuous f ∧ Function.Surjective f := by
+  let KH : Set (ℕ → unitInterval) := Set.range (embedHilbert X)
+  let KC : Set (ℕ → Bool) := cantorToHilbert ⁻¹' KH
+  have hKC_closed : IsClosed KC := by
+    apply IsClosed.preimage
+    · exact cantorToHilbert_continuous
+    · simp [KH]
+      apply Topology.IsClosedEmbedding.isClosed_range
+      apply Continuous.isClosedEmbedding
+      · exact embed_continuous
+      · exact embed_injective
+  have hKC_nonempty : KC.Nonempty := by
+    apply Set.Nonempty.preimage
+    · exact Set.range_nonempty (embedHilbert X)
+    · exact cantorToHilbert_surjective
+  rcases exists_retractionCantorSet hKC_closed hKC_nonempty with ⟨f, hf_continuous, hf_surjective⟩
+  obtain ⟨f, hf_continuous, hf_surjective⟩ : ∃ f : (ℕ → Bool) → KC, Continuous f ∧ Function.Surjective f := by
+
+    sorry
+  let g : X ≃ₜ KH := by
+    apply Topology.IsEmbedding.toHomeomorph
+    apply Topology.IsClosedEmbedding.toIsEmbedding
+    sorry -- refactor above then this
+  obtain ⟨h, hh_continuous, hh_surjective⟩ : ∃ h : KC → KH, Continuous h ∧ Function.Surjective h := by
+    sorry
+  use g.symm ∘ h ∘ f
+  constructor
+  · apply Continuous.comp
+    · exact Homeomorph.continuous_symm g
+    exact Continuous.comp hh_continuous hf_continuous
+  · apply Function.Surjective.comp
+    · exact Homeomorph.surjective g.symm
+    exact Function.Surjective.comp hh_surjective hf_surjective
 
 noncomputable def retractCantor (X : Type*) [MetricSpace X] [CompactSpace X] (x : cantorSet) : X :=
   let KH : Set (ℕ → unitInterval) := Set.range (embedHilbert X)
