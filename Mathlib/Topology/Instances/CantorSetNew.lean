@@ -171,13 +171,43 @@ theorem ofDigits_close {b : ℕ} [NeZero b] {x y : ℕ → Fin b} {n : ℕ} (hxy
     ofDigits_nonneg (digits := fun i ↦ y (i + n)), ofDigits_le_one (digits := fun i ↦ x (i + n)),
     ofDigits_le_one (digits := fun i ↦ y (i + n))]
 
-theorem kek {α : Type u} [Semiring α] [LinearOrder α] [FloorSemiring α] {y : α} {b : ℕ}
-    (hy : 0 ≤ y) (hb : 0 < b) : ⌊b * y⌋₊ / b = ⌊y⌋₊ := by
+-- A companion for Nat.cast_div_le
+theorem Nat.cast_div_ge {α : Type u} [Semifield α] [LinearOrder α] [IsStrictOrderedRing α]
+    {m n : ℕ} :
+    (m : α) / (n : α) + (n : α)⁻¹ ≤ ((m / n : ℕ) : α) + 1 := by
+  by_cases hn : n = 0
+  · simp [hn]
+  replace hn : 0 < (n : α) := by norm_cast; omega
+  apply le_of_mul_le_mul_right _ hn
+  field_simp
+  ring_nf
+  rw [← Nat.cast_mul, Nat.div_mul_self_eq_mod_sub_self, ← Nat.cast_add, ← Nat.cast_one,
+    ← Nat.cast_add, Nat.cast_le]
+  rw [cast_pos] at hn
+  apply Nat.mod_lt m at hn
+  omega
+
+theorem Nat.cast_div_ge' {α : Type u} [Field α] [LinearOrder α] [IsStrictOrderedRing α]
+    {m n : ℕ} :
+    (m : α) / (n : α) + (n : α)⁻¹ - 1 ≤ ((m / n : ℕ) : α) := by
+  linarith [Nat.cast_div_ge (α := α) (m := m) (n := n)]
+
+theorem Nat.mul_floor_div_eq_floor {α : Type u} [Semifield α] [LinearOrder α]
+    [IsStrictOrderedRing α] [FloorSemiring α] {y : α} {b : ℕ} (hy : 0 ≤ y) (hb : 0 < b) :
+    ⌊b * y⌋₊ / b = ⌊y⌋₊ := by
   symm
   rw [Nat.floor_eq_iff hy]
   constructor
-  · sorry
-  · sorry
+  · trans
+    · apply Nat.cast_div_le
+    rw [div_le_iff₀ (by norm_cast), mul_comm]
+    apply Nat.floor_le
+    positivity
+  · apply lt_of_lt_of_le _ Nat.cast_div_ge
+    apply lt_of_mul_lt_mul_right (a := (b : α)) _ (by simp)
+    field_simp
+    rw [mul_comm]
+    exact Nat.lt_floor_add_one _
 
 lemma ofDigits_reprReal_partial_sum_eq {x : ℝ} {b : ℕ} [inst : NeZero b] (hb : 1 < b)
     (hx : x ∈ Set.Ico 0 1) {n : ℕ} :
@@ -208,7 +238,7 @@ lemma ofDigits_reprReal_partial_sum_eq {x : ℝ} {b : ℕ} [inst : NeZero b] (hb
     norm_cast
     have : ⌊y⌋₊ = ⌊b * y⌋₊ / b := by
       symm
-      apply kek
+      apply Nat.mul_floor_div_eq_floor
       · simp [y]
         apply mul_nonneg
         · positivity
