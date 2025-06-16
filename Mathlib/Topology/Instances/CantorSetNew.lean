@@ -749,38 +749,35 @@ theorem cantorToHilbert_surjective : Function.Surjective cantorToHilbert := by
 /- Embedding to Hilber cube -/
 
 open Classical in
-noncomputable def embedHilbert (X : Type*) [PseudoMetricSpace X] [CompactSpace X] :
-    X → (ℕ → unitInterval) :=
-  if h : Nonempty X then
-    let s := TopologicalSpace.denseSeq X
-    fun x i =>
-      let d := dist x (s i)
-      let diam := Metric.diam (Set.univ : Set X)
-      have hd1 : d ≤ diam := by
-        simp [diam]
-        apply Metric.dist_le_diam_of_mem
-        · rwa [← Metric.compactSpace_iff_isBounded_univ]
-        · simp
-        · simp
-      have hd2 : (d / diam) ∈ unitInterval := by
-        simp
-        constructor
-        · positivity
-        · apply div_le_one_of_le₀ hd1
-          positivity
-      ⟨_, hd2⟩
-  else
-    fun x i ↦ 0
-
-theorem embed_continuous {X : Type*} [PseudoMetricSpace X] [CompactSpace X] :
-    Continuous (embedHilbert X) := by
-  simp [embedHilbert]
-  split_ifs <;> fun_prop
-
-theorem embed_injective {X : Type*} [MetricSpace X] [CompactSpace X] :
-    Function.Injective (embedHilbert X) := by
+theorem exists_closed_embedding_to_hilbert (X : Type*) [MetricSpace X] [CompactSpace X] :
+    ∃ f : X → (ℕ → unitInterval), Topology.IsClosedEmbedding f := by
+  let f : X → (ℕ → unitInterval) :=
+    if h : Nonempty X then
+      let s := TopologicalSpace.denseSeq X
+      fun x i =>
+        let d := dist x (s i)
+        let diam := Metric.diam (Set.univ : Set X)
+        have hd1 : d ≤ diam := by
+          simp [diam]
+          apply Metric.dist_le_diam_of_mem
+          · rwa [← Metric.compactSpace_iff_isBounded_univ]
+          · simp
+          · simp
+        have hd2 : (d / diam) ∈ unitInterval := by
+          simp
+          constructor
+          · positivity
+          · apply div_le_one_of_le₀ hd1
+            positivity
+        ⟨_, hd2⟩
+    else
+      fun x i ↦ 0
+  use f
+  apply Continuous.isClosedEmbedding
+  · simp [f]
+    split_ifs <;> fun_prop
   intro x y hxy
-  simp [embedHilbert] at hxy
+  simp [f] at hxy
   split_ifs at hxy with h
   swap
   · simp at h
@@ -807,10 +804,6 @@ theorem embed_injective {X : Type*} [MetricSpace X] [CompactSpace X] :
   have := dist_triangle x (s i) y
   linarith [dist_nonneg (x := x) (y := y)]
 
-theorem exists_closed_embedding_to_hilbert (X : Type*) [PseudoMetricSpace X] [CompactSpace X] :
-    ∃ f : X → (ℕ → unitInterval), Topology.IsClosedEmbedding f := by
-  sorry -- TODO: refactor the above to this
-
 /- Retraction to subset -/
 
 attribute [local instance] PiNat.metricSpace
@@ -822,97 +815,46 @@ theorem exists_retractionCantorSet {X : Set (ℕ → Bool)} (h_closed : IsClosed
 
 /- Retract to any metric space -/
 
-theorem exists_nat_bool_continuous_surjective_of_compact' (X : Type*) [Nonempty X] [MetricSpace X]
-    [CompactSpace X] : ∃ f : (ℕ → Bool) → X, Continuous f ∧ Function.Surjective f := by
-  let K := Function.Pullback (embedHilbert X) cantorToHilbert
-
-
 theorem exists_nat_bool_continuous_surjective_of_compact (X : Type*) [Nonempty X] [MetricSpace X]
     [CompactSpace X] : ∃ f : (ℕ → Bool) → X, Continuous f ∧ Function.Surjective f := by
-  let KH : Set (ℕ → unitInterval) := Set.range (embedHilbert X)
+  obtain ⟨emb, h_emb⟩ := exists_closed_embedding_to_hilbert X
+  let KH : Set (ℕ → unitInterval) := Set.range emb
   let KC : Set (ℕ → Bool) := cantorToHilbert ⁻¹' KH
   have hKC_closed : IsClosed KC := by
     apply IsClosed.preimage
     · exact cantorToHilbert_continuous
     · simp [KH]
-      apply Topology.IsClosedEmbedding.isClosed_range
-      apply Continuous.isClosedEmbedding
-      · exact embed_continuous
-      · exact embed_injective
+      apply Topology.IsClosedEmbedding.isClosed_range h_emb
   have hKC_nonempty : KC.Nonempty := by
     apply Set.Nonempty.preimage
-    · exact Set.range_nonempty (embedHilbert X)
+    · exact Set.range_nonempty emb
     · exact cantorToHilbert_surjective
   rcases exists_retractionCantorSet hKC_closed hKC_nonempty with ⟨f, hf_continuous, hf_surjective⟩
-  obtain ⟨f, hf_continuous, hf_surjective⟩ : ∃ f : (ℕ → Bool) → KC, Continuous f ∧ Function.Surjective f := by
-
-    sorry
+  let f' : (ℕ → Bool) → KC := Subtype.coind f (by simp [← hf_surjective])
+  have hf'_continuous : Continuous f' := Continuous.subtype_mk hf_continuous _
+  have hf'_surjective : Function.Surjective f' := by
+    intro ⟨y, hy⟩
+    simp [← hf_surjective] at hy
+    obtain ⟨x, hx⟩ := hy
+    use x
+    simpa [Subtype.eq_iff]
   let g : X ≃ₜ KH := by
     apply Topology.IsEmbedding.toHomeomorph
-    apply Topology.IsClosedEmbedding.toIsEmbedding
-    sorry -- refactor above then this
-  obtain ⟨h, hh_continuous, hh_surjective⟩ : ∃ h : KC → KH, Continuous h ∧ Function.Surjective h := by
-    sorry
-  use g.symm ∘ h ∘ f
+    apply Topology.IsClosedEmbedding.toIsEmbedding h_emb
+  let h : KC → KH := KH.restrictPreimage cantorToHilbert
+  have hh_continuous : Continuous h := Continuous.restrictPreimage cantorToHilbert_continuous
+  have hh_surjective : Function.Surjective h :=
+    Set.restrictPreimage_surjective _ cantorToHilbert_surjective
+  use g.symm ∘ h ∘ f'
   constructor
   · apply Continuous.comp
     · exact Homeomorph.continuous_symm g
-    exact Continuous.comp hh_continuous hf_continuous
+    exact Continuous.comp hh_continuous hf'_continuous
   · apply Function.Surjective.comp
     · exact Homeomorph.surjective g.symm
-    exact Function.Surjective.comp hh_surjective hf_surjective
-
-noncomputable def retractCantor (X : Type*) [MetricSpace X] [CompactSpace X] (x : cantorSet) : X :=
-  let KH : Set (ℕ → unitInterval) := Set.range (embedHilbert X)
-  let KC : Set (ℕ → Bool) := cantorToHilbert ⁻¹' KH
-  have hKC : IsClosed KC := by
-    sorry
-  let x' := cantorSet_homeo x
-  let y := retractCantorSubset hKC x'
-  let y' := cantorToHilbert y
-  sorry -- apply inverse to embedHilbert
-
-theorem retractCantor_continuous {X : Type*} [MetricSpace X] [CompactSpace X] :
-    Continuous (retractCantor X) := by
-  sorry
-
-theorem retractCantor_surjective {X : Type*} [MetricSpace X] [CompactSpace X] :
-    Function.Surjective (retractCantor X) := by
-  sorry
+    exact Function.Surjective.comp hh_surjective hf'_surjective
 
 /- Peano curve -/
-
-
--- lemma long_peano_curve (X : Type*) [MetricSpace X] [CompactSpace X] [i : TietzeExtension X] :
---     ∃ f : C(ℝ, X), Set.univ = f '' cantorSet := by
---   let g : C(cantorSet, X) :=
---     ⟨retractCantor X, by apply retractCantor_continuous⟩
---   have := @ContinuousMap.exists_restrict_eq ℝ _ _ cantorSet X _ i isClosed_cantorSet
---   have := @ContinuousMap.exists_restrict_eq X _ _ _ _ _ i _ isClosed_cantorSet g
---   obtain ⟨f, hf⟩ := ContinuousMap.exists_restrict_eq isClosed_cantorSet g
---   use f
---   have hg : Function.Surjective g := by
---     simp [g]
---     exact retractCantor_surjective
---   ext y
---   simp
---   obtain ⟨x, hx⟩ := hg y
---   use x
---   have := ContinuousMap.restrict_apply f cantorSet x
---   simp [← this, hf, hx]
-
--- lemma peano_curve :
---     ∃ f : C(unitInterval, unitInterval × unitInterval), Function.Surjective f := by
---   obtain ⟨f, hf⟩ := long_peano_curve
---   let g := ContinuousMap.restrict unitInterval f
---   use g
---   intro y
---   rw [Set.ext_iff] at hf
---   specialize hf y
---   simp at hf
---   obtain ⟨x, hx1, hx2⟩ := hf
---   use ⟨x, by simp [cantorSet] at hx1; specialize hx1 0; simpa using hx1⟩
---   simp [g, hx2]
 
 lemma unitInterval_eq_closedBall : unitInterval = Metric.closedBall 2⁻¹ 2⁻¹ := by
   ext x
@@ -925,24 +867,26 @@ instance : TietzeExtension unitInterval := by
   apply Metric.instTietzeExtensionClosedBall ℝ
   norm_num
 
-lemma long_peano_curve : ∃ f : C(ℝ, unitInterval × unitInterval), Set.univ = f '' cantorSet  := by
-  let g : C(cantorSet, unitInterval × unitInterval) :=
-    ⟨retractCantor (unitInterval × unitInterval), by apply retractCantor_continuous⟩
-  obtain ⟨f, hf⟩ := ContinuousMap.exists_restrict_eq isClosed_cantorSet g
+lemma exists_long_peano_curve :
+    ∃ f : C(ℝ, unitInterval × unitInterval), Set.univ = f '' cantorSet := by
+  obtain ⟨g, hg⟩ := exists_nat_bool_continuous_surjective_of_compact (unitInterval × unitInterval)
+  let g' : C(cantorSet, unitInterval × unitInterval) :=
+    ⟨g ∘ cantorSet_homeo, Continuous.comp hg.1 (Homeomorph.continuous _)⟩
+  obtain ⟨f, hf⟩ := ContinuousMap.exists_restrict_eq isClosed_cantorSet g'
   use f
-  have hg : Function.Surjective g := by
-    simp [g]
-    exact retractCantor_surjective
+  have hg' : Function.Surjective g' := by
+    simp [g']
+    exact hg.2
   ext y
   simp
-  obtain ⟨x, hx⟩ := hg y
+  obtain ⟨x, hx⟩ := hg' y
   use x
   have := ContinuousMap.restrict_apply f cantorSet x
   simp [← this, hf, hx]
 
-lemma peano_curve :
+lemma exists_peano_curve :
     ∃ f : C(unitInterval, unitInterval × unitInterval), Function.Surjective f := by
-  obtain ⟨f, hf⟩ := long_peano_curve
+  obtain ⟨f, hf⟩ := exists_long_peano_curve
   let g := ContinuousMap.restrict unitInterval f
   use g
   intro y
