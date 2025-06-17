@@ -54,6 +54,46 @@ lemma preCantorSet_subset_unitInterval {n : ℕ} : preCantorSet n ⊆ Set.Icc 0 
   rw [← preCantorSet_zero]
   apply preCantorSet_Antitone (by simp)
 
+/- Nat.cast_div bounds & Nat.mul_floor_div_eq_floor -/
+
+-- A companion for Nat.cast_div_le
+theorem Nat.cast_div_ge {α : Type u} [Semifield α] [LinearOrder α] [IsStrictOrderedRing α]
+    {m n : ℕ} :
+    (m : α) / (n : α) + (n : α)⁻¹ ≤ ((m / n : ℕ) : α) + 1 := by
+  by_cases hn : n = 0
+  · simp [hn]
+  replace hn : 0 < (n : α) := by norm_cast; omega
+  apply le_of_mul_le_mul_right _ hn
+  field_simp
+  ring_nf
+  rw [← Nat.cast_mul, Nat.div_mul_self_eq_mod_sub_self, ← Nat.cast_add, ← Nat.cast_one,
+    ← Nat.cast_add, Nat.cast_le]
+  rw [cast_pos] at hn
+  apply Nat.mod_lt m at hn
+  omega
+
+theorem Nat.cast_div_ge' {α : Type u} [Field α] [LinearOrder α] [IsStrictOrderedRing α]
+    {m n : ℕ} :
+    (m : α) / (n : α) + (n : α)⁻¹ - 1 ≤ ((m / n : ℕ) : α) := by
+  linarith [Nat.cast_div_ge (α := α) (m := m) (n := n)]
+
+theorem Nat.mul_floor_div_eq_floor {α : Type u} [Semifield α] [LinearOrder α]
+    [IsStrictOrderedRing α] [FloorSemiring α] {y : α} {b : ℕ} (hy : 0 ≤ y) (hb : 0 < b) :
+    ⌊b * y⌋₊ / b = ⌊y⌋₊ := by
+  symm
+  rw [Nat.floor_eq_iff hy]
+  constructor
+  · trans
+    · apply Nat.cast_div_le
+    rw [div_le_iff₀ (by norm_cast), mul_comm]
+    apply Nat.floor_le
+    positivity
+  · apply lt_of_lt_of_le _ Nat.cast_div_ge
+    apply lt_of_mul_lt_mul_right (a := (b : α)) _ (by simp)
+    field_simp
+    rw [mul_comm]
+    exact Nat.lt_floor_add_one _
+
 /- Representation of reals in positional system -/
 
 noncomputable def reprReal (x : ℝ) (b : ℕ) [NeZero b] : ℕ → Fin b :=
@@ -171,44 +211,6 @@ theorem ofDigits_close {b : ℕ} [NeZero b] {x y : ℕ → Fin b} {n : ℕ} (hxy
     ofDigits_nonneg (digits := fun i ↦ y (i + n)), ofDigits_le_one (digits := fun i ↦ x (i + n)),
     ofDigits_le_one (digits := fun i ↦ y (i + n))]
 
--- A companion for Nat.cast_div_le
-theorem Nat.cast_div_ge {α : Type u} [Semifield α] [LinearOrder α] [IsStrictOrderedRing α]
-    {m n : ℕ} :
-    (m : α) / (n : α) + (n : α)⁻¹ ≤ ((m / n : ℕ) : α) + 1 := by
-  by_cases hn : n = 0
-  · simp [hn]
-  replace hn : 0 < (n : α) := by norm_cast; omega
-  apply le_of_mul_le_mul_right _ hn
-  field_simp
-  ring_nf
-  rw [← Nat.cast_mul, Nat.div_mul_self_eq_mod_sub_self, ← Nat.cast_add, ← Nat.cast_one,
-    ← Nat.cast_add, Nat.cast_le]
-  rw [cast_pos] at hn
-  apply Nat.mod_lt m at hn
-  omega
-
-theorem Nat.cast_div_ge' {α : Type u} [Field α] [LinearOrder α] [IsStrictOrderedRing α]
-    {m n : ℕ} :
-    (m : α) / (n : α) + (n : α)⁻¹ - 1 ≤ ((m / n : ℕ) : α) := by
-  linarith [Nat.cast_div_ge (α := α) (m := m) (n := n)]
-
-theorem Nat.mul_floor_div_eq_floor {α : Type u} [Semifield α] [LinearOrder α]
-    [IsStrictOrderedRing α] [FloorSemiring α] {y : α} {b : ℕ} (hy : 0 ≤ y) (hb : 0 < b) :
-    ⌊b * y⌋₊ / b = ⌊y⌋₊ := by
-  symm
-  rw [Nat.floor_eq_iff hy]
-  constructor
-  · trans
-    · apply Nat.cast_div_le
-    rw [div_le_iff₀ (by norm_cast), mul_comm]
-    apply Nat.floor_le
-    positivity
-  · apply lt_of_lt_of_le _ Nat.cast_div_ge
-    apply lt_of_mul_lt_mul_right (a := (b : α)) _ (by simp)
-    field_simp
-    rw [mul_comm]
-    exact Nat.lt_floor_add_one _
-
 lemma ofDigits_reprReal_partial_sum_eq {x : ℝ} {b : ℕ} [inst : NeZero b] (hb : 1 < b)
     (hx : x ∈ Set.Ico 0 1) {n : ℕ} :
     b^n * ∑ i ∈ Finset.range n, ofDigitsTerm (reprReal x b) i = ⌊b^n * x⌋₊ := by
@@ -296,6 +298,8 @@ theorem reprReal_ofDigits (b : ℕ) [NeZero b] (x : ℝ) (hb : 1 < b) (hx : x �
   rw [← Summable.hasSum_iff]
   · exact ofDigits_HasSum x b hb hx
   · exact ofDigitsTerm_Summable
+
+/- Cantor set is a set of 0-2 numbers & C ≃ ℕ → Bool -/
 
 theorem cantorRepr_HasSum_unique {a b : ℕ → Fin 3} {x : ℝ}
     (ha1 : HasSum (ofDigitsTerm a) x)
@@ -575,6 +579,17 @@ theorem ofDigits_cantorToDigits {x : ℝ} (hx : x ∈ cantorSet) :
     dsimp only
     exact ofDigits_cantorToDigits_partial_sum_le hx
 
+theorem cantorSet_eq_zero_two_set :
+    cantorSet = {x | ∃ a : ℕ → Fin 3, (∀ i, a i ≠ 1) ∧ ofDigits a = x} := by
+  ext x
+  refine ⟨fun h ↦ ?_, fun ⟨a, ha⟩ ↦ ?_⟩
+  · use cantorToDigits x
+    constructor
+    · apply cantorToDigits_ne_one
+    · apply ofDigits_cantorToDigits h
+  · rw [← ha.2]
+    exact cantorRepr_ofDigits_mem_cantorSet ha.1
+
 noncomputable def cantorSet_equiv : cantorSet ≃ (ℕ → Bool) where
   toFun := fun ⟨x, h⟩ ↦ (cantorToBinary x).get
   invFun (y : ℕ → Bool) :=
@@ -614,6 +629,8 @@ noncomputable def cantorSet_equiv : cantorSet ≃ (ℕ → Bool) where
     generalize (cantorToBinary x).get n = a at this
     generalize y n = b at this
     cases a <;> cases b <;> first | rfl | simp at this
+
+/- Homeomorphism C and (ℕ → Bool) -/
 
 instance : CompactSpace cantorSet := by
   rw [← isCompact_iff_compactSpace]
@@ -834,7 +851,7 @@ theorem exists_closed_embedding_to_hilbert (X : Type*) [MetricSpace X] [CompactS
   have := dist_triangle x (s i) y
   linarith [dist_nonneg (x := x) (y := y)]
 
-/- Retraction to subset -/
+/- Retraction to any metric space -/
 
 attribute [local instance] PiNat.metricSpace
 
@@ -842,8 +859,6 @@ theorem exists_retractionCantorSet {X : Set (ℕ → Bool)} (h_closed : IsClosed
     (h_nonempty : X.Nonempty) : ∃ f : (ℕ → Bool) → (ℕ → Bool), Continuous f ∧ Set.range f = X := by
   rcases PiNat.exists_lipschitz_retraction_of_isClosed h_closed h_nonempty with ⟨f, fs, frange, hf⟩
   exact ⟨f, hf.continuous, frange⟩
-
-/- Retract to any metric space -/
 
 theorem exists_nat_bool_continuous_surjective_of_compact (X : Type*) [Nonempty X] [MetricSpace X]
     [CompactSpace X] : ∃ f : (ℕ → Bool) → X, Continuous f ∧ Function.Surjective f := by
