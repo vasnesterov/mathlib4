@@ -88,9 +88,6 @@ theorem Nat.mul_floor_div_eq_floor {α : Type u} [Semifield α] [LinearOrder α]
 
 /- Representation of reals in positional system -/
 
-noncomputable def reprReal (x : ℝ) (b : ℕ) [NeZero b] : ℕ → Fin b :=
-  fun i ↦ Fin.ofNat _ <| ⌊x * b^(i + 1)⌋₊ % b
-
 noncomputable def ofDigitsTerm {b : ℕ} [NeZero b] (digits : ℕ → Fin b) : ℕ → ℝ :=
   fun i ↦ (digits i) * (b⁻¹ : ℝ)^(i + 1)
 
@@ -203,6 +200,9 @@ theorem ofDigits_close {b : ℕ} [NeZero b] {x y : ℕ → Fin b} {n : ℕ} (hxy
     ofDigits_nonneg (digits := fun i ↦ y (i + n)), ofDigits_le_one (digits := fun i ↦ x (i + n)),
     ofDigits_le_one (digits := fun i ↦ y (i + n))]
 
+noncomputable def reprReal (x : ℝ) (b : ℕ) [NeZero b] : ℕ → Fin b :=
+  fun i ↦ Fin.ofNat _ <| ⌊x * b^(i + 1)⌋₊ % b
+
 lemma ofDigits_reprReal_partial_sum_eq {x : ℝ} {b : ℕ} [inst : NeZero b] (hb : 1 < b)
     (hx : x ∈ Set.Ico 0 1) {n : ℕ} :
     b^n * ∑ i ∈ Finset.range n, ofDigitsTerm (reprReal x b) i = ⌊b^n * x⌋₊ := by
@@ -279,7 +279,7 @@ theorem ofDigits_HasSum (x : ℝ) (b : ℕ) [NeZero b] (hb : 1 < b) (hx : x ∈ 
     simp
     exact ofDigits_reprReal_partial_sum_le hb hx
 
-theorem reprReal_ofDigits (b : ℕ) [NeZero b] (x : ℝ) (hb : 1 < b) (hx : x ∈ Set.Ico 0 1) :
+theorem ofDigits_reprReal (b : ℕ) [NeZero b] (x : ℝ) (hb : 1 < b) (hx : x ∈ Set.Ico 0 1) :
     ofDigits (reprReal x b) = x := by
   simp [ofDigits]
   rw [← Summable.hasSum_iff]
@@ -741,8 +741,8 @@ theorem fromBinary_surjective : Function.Surjective fromBinary := by
     simp at hx ⊢
     exact ⟨hx.left, by apply hx.right.lt_of_ne' (by symm; simpa)⟩
   use finTwoEquiv ∘ (reprReal x 2)
-  simp [fromBinary, ← Function.comp_assoc, reprReal_ofDigits]
-  conv => rhs; rw [← reprReal_ofDigits 2 x (by simp) hx]
+  simp [fromBinary, ← Function.comp_assoc, ofDigits_reprReal]
+  conv => rhs; rw [← ofDigits_reprReal 2 x (by simp) hx]
   congr
   ext n
   simp
