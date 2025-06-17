@@ -78,21 +78,13 @@ theorem Nat.cast_div_ge' {α : Type u} [Field α] [LinearOrder α] [IsStrictOrde
   linarith [Nat.cast_div_ge (α := α) (m := m) (n := n)]
 
 theorem Nat.mul_floor_div_eq_floor {α : Type u} [Semifield α] [LinearOrder α]
-    [IsStrictOrderedRing α] [FloorSemiring α] {y : α} {b : ℕ} (hy : 0 ≤ y) (hb : 0 < b) :
+    [IsStrictOrderedRing α] [FloorSemiring α] {y : α} {b : ℕ} (hb : 0 < b) :
     ⌊b * y⌋₊ / b = ⌊y⌋₊ := by
-  symm
-  rw [Nat.floor_eq_iff hy]
-  constructor
-  · trans
-    · apply Nat.cast_div_le
-    rw [div_le_iff₀ (by norm_cast), mul_comm]
-    apply Nat.floor_le
-    positivity
-  · apply lt_of_lt_of_le _ Nat.cast_div_ge
-    apply lt_of_mul_lt_mul_right (a := (b : α)) _ (by simp)
-    field_simp
-    rw [mul_comm]
-    exact Nat.lt_floor_add_one _
+  convert (floor_div_natCast (y * b) b).symm using 3
+  · rw [mul_comm]
+  · rw [mul_div_cancel_right₀]
+    norm_cast
+    exact Nat.ne_zero_of_lt hb
 
 /- Representation of reals in positional system -/
 
@@ -241,11 +233,6 @@ lemma ofDigits_reprReal_partial_sum_eq {x : ℝ} {b : ℕ} [inst : NeZero b] (hb
     have : ⌊y⌋₊ = ⌊b * y⌋₊ / b := by
       symm
       apply Nat.mul_floor_div_eq_floor
-      · simp [y]
-        apply mul_nonneg
-        · positivity
-        · simp at hx
-          exact hx.left
       · omega
     rw [this]
     conv => rhs; rw [← Nat.mod_add_div ⌊(b : ℝ) * y⌋₊ b]
