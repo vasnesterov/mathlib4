@@ -10,6 +10,7 @@ import Mathlib.Tactic.Order.ToInt
 import Mathlib.Tactic.Order.Graph.Basic
 import Mathlib.Tactic.Order.Graph.Tarjan
 import Mathlib.Util.ElabWithoutMVars
+import Mathlib.Tactic.CC
 
 /-!
 # `order` tactic
